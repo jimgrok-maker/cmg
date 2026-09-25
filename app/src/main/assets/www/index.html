@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#101816" />
+  <title>CMG — Course Made Good</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div>
+        <div class="brand">CMG</div>
+        <div class="sub">Course Made Good</div>
+      </div>
+      <div style="flex:1"></div>
+      <button type="button" id="editSetup">Setup</button>
+    </header>
+    <section id="setup" class="sheet">
+      <h2>Lake Erie</h2>
+      <div class="row">
+        <label>Wind source
+          <select id="windSource">
+            <option value="hrrr">HRRR (default)</option>
+            <option value="gfs">GFS</option>
+            <option value="ecmwf">ECMWF</option>
+            <option value="manual">Manual TWD / TWS</option>
+          </select>
+        </label>
+        <label>Depth chart
+          <select id="depth">
+            <option value="noaa">NOAA ENC / BlueTopo — shoreline only</option>
+            <option value="chs">CHS note (Pelee / Middle Is.) — shoreline only</option>
+          </select>
+        </label>
+      </div>
+      <div class="row" style="margin-top:0.45rem">
+        <label>Boat
+          <select id="boat"></select>
+        </label>
+        <label id="genericWrap" class="hidden">LWL (ft)
+          <input id="genericLwl" type="number" min="12" max="50" step="0.1" />
+        </label>
+      </div>
+      <p id="boatMeta" class="disclaimer"></p>
+      <label style="margin-top:0.4rem;flex-direction:row;align-items:center;gap:0.45rem;text-transform:none">
+        <input type="checkbox" id="mag" /> Magnetic courses (Var 7.6°W)
+      </label>
+      <div class="chip">Check official NOAA / CHS chart for depths. CMG stays inside the shoreline. Planning aid — not a chartplotter.</div>
+      <button class="primary" id="openChart" style="width:100%;margin-top:0.4rem">Open chart</button>
+    </section>
+    <div id="planner" class="hidden">
+      <div id="map"></div>
+      <div class="legend">
+        <div><i style="background:#3d9a6a"></i>paying reach</div>
+        <div><i style="background:#c9b23a"></i>tight / deep</div>
+        <div><i style="background:#b54a3c"></i>no-go / pinch</div>
+        <div><i style="background:#6b8ea8"></i>motor 4 kn</div>
+      </div>
+      <section class="sheet">
+        <div class="row3">
+          <label>TWS kn<input id="tws" type="number" step="0.5" min="0" max="40" /></label>
+          <label>TWD °<input id="twd" type="number" step="1" min="0" max="360" /></label>
+          <label>Listed mark<select id="poi"></select></label>
+        </div>
+        <p id="windLabel" class="disclaimer"></p>
+        <label style="flex-direction:row;align-items:center;gap:0.45rem;text-transform:none;margin:0.3rem 0">
+          <input type="checkbox" id="hybrid" /> Hybrid compare — motor 4 kn if VMG < 2 kn
+        </label>
+        <div id="wps"></div>
+        <div style="display:flex;gap:0.4rem;margin-top:0.35rem">
+          <button class="ghost" id="clearWp">Clear marks</button>
+        </div>
+        <div class="stats" id="stats"></div>
+        <p id="routeWarn" class="chip hidden"></p>
+        <p class="disclaimer">Tap the water to drop a mark. Default is sail-only. Board down, ballast full on the 26X. Working sails only.</p>
+      </section>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="data/islands.js"></script>
+  <script src="js/pois.js"></script>
+  <script src="js/geo.js"></script>
+  <script src="js/polars.js"></script>
+  <script src="js/wind.js"></script>
+  <script src="js/route.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
