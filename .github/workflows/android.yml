@@ -8,8 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -18,20 +16,21 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
       - name: Assemble debug APK
-        run: gradle assembleDebug --no-daemon
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk dist/cmg-0.1.0-debug.apk
-          ls -la dist
+          ls -la dist app/build/outputs/apk/debug || true
 
       - uses: actions/upload-artifact@v4
         with:
