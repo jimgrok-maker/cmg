@@ -66,7 +66,7 @@
     L.polygon(state.lakeRing.map((c) => [c[1], c[0]]), { color:"#2e6a78", weight:1, fill:false }).addTo(map);
     islandLayer.clearLayers();
     CMG_ISLANDS.forEach((isl) => {
-      L.polygon(isl.ring.map((c) => [c[1], c[0]]), { color:"#6a8a72", weight:1, fillColor:"#1c2a20", fillOpacity:0.55 }).addTo(islandLayer).bindTooltip(isl.name, { sticky:true });
+      L.polygon(isl.ring.map((c) => [c[1], c[0]]), { color:"#4a6a52", weight:1, fillColor:"#1c2a20", fillOpacity:0.28 }).addTo(islandLayer).bindTooltip(isl.name, { sticky:true });
     });
     state.lakeReady = true;
   }
@@ -97,7 +97,11 @@
     if (!rt) return;
     rt.segs.forEach((s) => {
       L.polyline([[s.from.lat, s.from.lon], [s.to.lat, s.to.lon]], { color:s.color, weight:s.land?2:5, dashArray:s.land?"6 6":null, opacity:0.95 })
-        .addTo(routeLayer).bindTooltip(fmtCrs(s.course) + " · " + s.dist.toFixed(2) + " nm · TWA " + Math.round(s.twa) + "° · " + (s.mode==="motor" ? "motor 4 kn" : s.bsp.toFixed(1)+" kn"));
+        .addTo(routeLayer).bindTooltip(
+          fmtCrs(s.course) + " · " + s.dist.toFixed(2) + " nm · TWA " + Math.round(s.twa) + "° · " +
+          (s.mode==="motor" ? "motor 4 kn" : s.bsp.toFixed(1)+" kn") +
+          (s.twd != null ? " · wind FROM " + String(Math.round(s.twd)).padStart(3,"0") + "°" : "")
+        );
     });
   }
   function windAtHours(hFromNow) {
@@ -110,25 +114,28 @@
   function placeWindArrow(lat, lon, hours, w) {
     const from = CMGGeo.wrap360(w.twd);
     const to = CMGGeo.wrap360(from + 180);
-    const rot = to;
     const when = hours < 0.05 ? "now" : "+" + Math.round(hours) + "h";
-    const html =
-      '<div class="wind-vec">' +
-        '<div class="rot" style="transform:rotate(' + rot + 'deg)">' +
-          '<div class="head"></div><div class="shaft"></div>' +
-        '</div>' +
-        '<div class="lab">' + when + ' FROM ' + String(Math.round(from)).padStart(3,"0") + '°</div>' +
-      '</div>';
-    L.marker([lat, lon], {
-      icon: L.divIcon({ className: "wind-mark", html: html, iconSize: [48, 60], iconAnchor: [24, 22] }),
-      interactive: true,
-      keyboard: false
-    }).addTo(windLayer).bindTooltip(
+    const tip =
       when + " · wind FROM " + String(Math.round(from)).padStart(3,"0") + "°T · " +
       (w.tws != null ? Number(w.tws).toFixed(0) + " kn" : "") +
       " · blowing toward " + String(Math.round(to)).padStart(3,"0") + "°" +
-      (w.clock ? " · " + String(w.clock).slice(11,16) : "")
-    );
+      (w.clock ? " · " + String(w.clock).slice(11,16) : "");
+    const arrowHtml =
+      '<div class="wind-vec"><div class="rot" style="transform:rotate(' + to + 'deg)">' +
+      '<div class="head"></div><div class="shaft"></div></div></div>';
+    L.marker([lat, lon], {
+      icon: L.divIcon({ className: "wind-mark", html: arrowHtml, iconSize: [22, 28], iconAnchor: [11, 14] }),
+      interactive: true, keyboard: false
+    }).addTo(windLayer).bindTooltip(tip);
+    const off = CMGGeo.destPoint({ lat: lat, lon: lon }, to, 0.42);
+    L.marker([off.lat, off.lon], {
+      icon: L.divIcon({
+        className: "wind-mark",
+        html: '<div class="wind-lab">' + when + " " + String(Math.round(from)).padStart(3,"0") + "°</div>",
+        iconSize: [64, 16], iconAnchor: [32, 8]
+      }),
+      interactive: true, keyboard: false
+    }).addTo(windLayer).bindTooltip(tip);
   }
   function drawWindArrows(rt) {
     if (!windLayer) return;
@@ -146,18 +153,13 @@
     let acc = 0;
     rt.segs.forEach((s) => {
       const h = isFinite(s.hours) ? s.hours : 0;
-      const start = acc;
-      const end = acc + h;
+      const start = (s.startH != null) ? s.startH : acc;
+      const end = start + h;
       for (let t = step; t < end + 1e-6; t += step) {
         if (t + 1e-6 < start) continue;
         const frac = h > 0 ? (t - start) / h : 1;
         const f = Math.max(0, Math.min(1, frac));
         addMark(t, s.from.lat + (s.to.lat - s.from.lat) * f, s.from.lon + (s.to.lon - s.from.lon) * f);
-      }
-      const w0 = windAtHours(start);
-      const w1 = windAtHours(end);
-      if (w0 && w1 && CMGGeo.angleDiff(w0.twd, w1.twd) >= 20 && h > 0.4) {
-        addMark(start + h / 2, (s.from.lat + s.to.lat) / 2, (s.from.lon + s.to.lon) / 2);
       }
       acc = end;
     });
@@ -173,7 +175,10 @@
       out.innerHTML = "";
       return;
     }
-    const rt = CMGRoute.buildRoute(state.waypoints, boat(), state.tws, state.twd, state.lakeRing, window.CMG_ISLANDS, state.hybrid);
+    const rt = CMGRoute.buildRoute(
+      state.waypoints, boat(), state.tws, state.twd,
+      state.lakeRing, window.CMG_ISLANDS, state.hybrid, windAtHours
+    );
     state.route = rt; drawRoute(rt); drawWindArrows(rt);
     out.innerHTML =
       '<div class="stat"><b>' + rt.totalNm.toFixed(1) + '</b><span>nm sailed</span></div>' +
@@ -231,7 +236,8 @@
     windLayer = L.layerGroup().addTo(map);
     map.on("click", (e) => addWp({ lat:e.latlng.lat, lon:e.latlng.lng, name:"Tap " + (state.waypoints.length + 1) }));
     CMG_POIS.forEach((p) => {
-      L.marker([p.lat, p.lon], { icon: L.divIcon({ className:"poi-div", html: p.name.split(" ")[0] }) }).addTo(map).on("click", () => addWp({ lat:p.lat, lon:p.lon, name:p.name }));
+      L.marker([p.lat, p.lon], { icon: L.divIcon({ className:"poi-div", html: p.short || p.name }) })
+        .addTo(map).on("click", () => addWp({ lat:p.lat, lon:p.lon, name:p.name }));
     });
     window.addEventListener("resize", resizeMap);
   }
