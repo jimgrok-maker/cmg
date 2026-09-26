@@ -18,11 +18,17 @@
       <div style="flex:1"></div>
       <button type="button" id="editSetup">Setup</button>
     </header>
-    <section id="setup" class="sheet">
+    <section id="setup" class="sheet setup-sheet">
       <h2 id="setupTitle">Water</h2>
-      <label>Lake or bay
-        <select id="lake"></select>
-      </label>
+      <label for="lake">Lake or bay</label>
+      <select id="lake">
+        <option value="erie" selected>Lake Erie</option>
+        <option value="ontario">Lake Ontario</option>
+        <option value="huron">Lake Huron</option>
+        <option value="michigan">Lake Michigan</option>
+        <option value="superior">Lake Superior</option>
+        <option value="chesapeake">Chesapeake Bay</option>
+      </select>
       <div class="row" style="margin-top:0.45rem">
         <label>Wind source
           <select id="windSource">
