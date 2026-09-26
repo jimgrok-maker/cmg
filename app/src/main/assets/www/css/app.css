@@ -39,33 +39,26 @@ button.ghost { background: transparent; }
 .hidden { display: none !important; }
 .disclaimer { font-size: 0.68rem; color: var(--muted); margin-top: 0.45rem; line-height: 1.35; }
 .leaflet-container { background: #b7d1d8; font-family: inherit; width: 100%; height: 100%; }
-.poi-div { background: #1c2e24; color: var(--ink); border: 1px solid #3d9a6a; border-radius: 10px; padding: 1px 6px; font-size: 10px; white-space: nowrap; }
+.poi-div { background: #1c2e24; color: var(--ink); border: 1px solid #3d9a6a; border-radius: 10px; padding: 1px 5px; font-size: 9px; white-space: nowrap; }
 .legend {
   position: absolute; left: 8px; bottom: 8px; z-index: 1000;
-  background: rgba(16,24,22,0.9); border: 1px solid var(--line);
-  border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.68rem; pointer-events: none;
+  background: rgba(16,24,22,0.88); border: 1px solid var(--line);
+  border-radius: 6px; padding: 0.25rem 0.4rem; font-size: 0.62rem; pointer-events: none;
+  display: flex; flex-wrap: wrap; gap: 0.25rem 0.55rem; max-width: 46%;
 }
-.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 3px; }
 .wind-mark { background: none; border: 0; }
-.wind-vec {
-  width: 44px; height: 58px;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-}
-.wind-vec .rot {
-  width: 20px; height: 28px;
-  display: flex; flex-direction: column; align-items: center;
-  transform-origin: 50% 50%;
-}
+.wind-vec { width: 22px; height: 28px; display: flex; align-items: center; justify-content: center; }
+.wind-vec .rot { width: 14px; height: 22px; display: flex; flex-direction: column; align-items: center; transform-origin: 50% 50%; }
 .wind-vec .head {
   width: 0; height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-bottom: 11px solid #d4b24a;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 8px solid #d4b24a;
 }
-.wind-vec .shaft { width: 3px; height: 16px; background: #d4b24a; }
-.wind-vec .lab {
-  margin-top: 2px;
-  font-size: 9px; line-height: 1.15; text-align: center;
+.wind-vec .shaft { width: 2px; height: 12px; background: #d4b24a; }
+.wind-lab {
+  font-size: 9px; line-height: 1.1; text-align: center;
   color: #1c1810; background: #d4b24a;
   border-radius: 3px; padding: 1px 3px; white-space: nowrap;
 }
