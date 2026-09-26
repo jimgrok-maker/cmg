@@ -7,8 +7,11 @@
   };
   let map, routeLayer, wpLayer, islandLayer, windLayer, poiLayer;
 
-  function lake() { return CMGLakeById(state.lakeId); }
-  function poisHere() { return CMG_POIS.filter(function (p) { return p.lake === state.lakeId; }); }
+  function lake() {
+    if (typeof CMGLakeById === "function") return CMGLakeById(state.lakeId);
+    return { id: state.lakeId || "erie", name: "Lake Erie", center: [41.66, -82.82], zoom: 9, variationW: 7.6, tz: "America/New_York", ring: [] };
+  }
+  function poisHere() { return (window.CMG_POIS || []).filter(function (p) { return p.lake === state.lakeId; }); }
   function islandsHere() { return state.lakeId === "erie" ? (window.CMG_ISLANDS || []) : []; }
   function boat() {
     return state.boatId === "generic" ? CMGPolars.genericClass(state.genericLwl) : CMGPolars.CLASSES[state.boatId];
@@ -46,11 +49,13 @@
   }
   function fillLakes() {
     const sel = document.getElementById("lake");
-    sel.innerHTML = "";
-    CMG_LAKES.forEach(function (l) {
-      const o = document.createElement("option"); o.value = l.id; o.textContent = l.name; sel.appendChild(o);
-    });
-    sel.value = state.lakeId;
+    if (!sel.options.length && window.CMG_LAKES) {
+      window.CMG_LAKES.forEach(function (l) {
+        const o = document.createElement("option"); o.value = l.id; o.textContent = l.name; sel.appendChild(o);
+      });
+    }
+    sel.value = state.lakeId || "erie";
+    if (!sel.value) sel.selectedIndex = 0;
   }
   function fillPois() {
     const s = document.getElementById("poi");
@@ -60,7 +65,7 @@
     });
   }
   function bindSetup() {
-    document.getElementById("lake").value = state.lakeId;
+    document.getElementById("lake").value = state.lakeId || "erie";
     document.getElementById("windSource").value = state.windSource;
     document.getElementById("depth").value = state.depth;
     document.getElementById("boat").value = state.boatId;
@@ -89,10 +94,12 @@
   }
   function applyLake() {
     const Ldef = lake();
-    state.lakeRing = Ldef.ring;
+    state.lakeRing = Ldef.ring || null;
     state.islands = islandsHere();
     if (state.outline) map.removeLayer(state.outline);
-    state.outline = L.polygon(Ldef.ring.map(function (c) { return [c[1], c[0]]; }), { color:"#2e6a78", weight:1, fill:false }).addTo(map);
+    if (Ldef.ring && Ldef.ring.length) {
+      state.outline = L.polygon(Ldef.ring.map(function (c) { return [c[1], c[0]]; }), { color:"#2e6a78", weight:1, fill:false }).addTo(map);
+    }
     islandLayer.clearLayers();
     state.islands.forEach(function (isl) {
       L.polygon(isl.ring.map(function (c) { return [c[1], c[0]]; }), { color:"#4a6a52", weight:1, fillColor:"#1c2a20", fillOpacity:0.28 }).addTo(islandLayer).bindTooltip(isl.name, { sticky:true });
@@ -279,6 +286,7 @@
     window.addEventListener("resize", resizeMap);
   }
   function changeLake(id) {
+    if (!id) return;
     state.lakeId = id;
     state.waypoints = [];
     state.route = null;
@@ -303,7 +311,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     loadPrefs(); fillLakes(); renderBoatOptions(); bindSetup();
     document.getElementById("poi").onchange = function () {
-      const p = CMG_POIS.find(function (x) { return x.id === document.getElementById("poi").value; });
+      const p = (window.CMG_POIS || []).find(function (x) { return x.id === document.getElementById("poi").value; });
       if (p) addWp({ lat:p.lat, lon:p.lon, name:p.name });
       document.getElementById("poi").value = "";
     };
