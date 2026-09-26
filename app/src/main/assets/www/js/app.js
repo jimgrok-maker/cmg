@@ -4,7 +4,7 @@
   const state = {
     windSource: "hrrr", depth: "noaa", boatId: "mac26x", genericLwl: 23,
     magnetic: false, hybrid: false, tws: 10, twd: 270,
-    windPack: null, waypoints: [], lakeRing: null, route: null
+    windPack: null, waypoints: [], lakeRing: null, route: null, lakeReady: false
   };
   let map, routeLayer, wpLayer, islandLayer;
 
@@ -55,20 +55,27 @@
     const g = document.createElement("option"); g.value = "generic"; g.textContent = "Generic (LWL formula)"; sel.appendChild(g);
     sel.value = state.boatId;
   }
+  function resizeMap() {
+    if (!map) return;
+    map.invalidateSize({ animate: false });
+  }
   async function loadLake() {
+    if (state.lakeReady || !map) return;
     const gj = await (await fetch("data/erie.json")).json();
     state.lakeRing = gj.features[0].geometry.coordinates[0];
-    L.polygon(state.lakeRing.map((c) => [c[1], c[0]]), { color:"#2e6a78", weight:1, fillColor:"#123038", fillOpacity:0.35 }).addTo(map);
+    L.polygon(state.lakeRing.map((c) => [c[1], c[0]]), { color:"#2e6a78", weight:1, fill:false }).addTo(map);
     islandLayer.clearLayers();
     CMG_ISLANDS.forEach((isl) => {
-      L.polygon(isl.ring.map((c) => [c[1], c[0]]), { color:"#6a8a72", weight:1, fillColor:"#1c2a20", fillOpacity:0.85 }).addTo(islandLayer).bindTooltip(isl.name, { sticky:true });
+      L.polygon(isl.ring.map((c) => [c[1], c[0]]), { color:"#6a8a72", weight:1, fillColor:"#1c2a20", fillOpacity:0.55 }).addTo(islandLayer).bindTooltip(isl.name, { sticky:true });
     });
+    state.lakeReady = true;
   }
   function addWp(pt) {
     state.waypoints.push({ lat: pt.lat, lon: pt.lon, name: pt.name || ("Mark " + (state.waypoints.length + 1)) });
     drawWaypoints(); renderWpList(); compute();
   }
   function drawWaypoints() {
+    if (!wpLayer) return;
     wpLayer.clearLayers();
     state.waypoints.forEach((w, i) => {
       L.circleMarker([w.lat, w.lon], { radius:7, color:"#e7efe8", fillColor:"#3d9a6a", fillOpacity:1, weight:2 }).addTo(wpLayer).bindTooltip((i+1) + " · " + w.name);
@@ -85,6 +92,7 @@
     });
   }
   function drawRoute(rt) {
+    if (!routeLayer) return;
     routeLayer.clearLayers();
     if (!rt) return;
     rt.segs.forEach((s) => {
@@ -94,7 +102,7 @@
   }
   function compute() {
     const out = document.getElementById("stats");
-    if (state.waypoints.length < 2) { state.route = null; routeLayer.clearLayers(); out.innerHTML = ""; return; }
+    if (!map || state.waypoints.length < 2) { state.route = null; if (routeLayer) routeLayer.clearLayers(); out.innerHTML = ""; return; }
     const rt = CMGRoute.buildRoute(state.waypoints, boat(), state.tws, state.twd, state.lakeRing, window.CMG_ISLANDS, state.hybrid);
     state.route = rt; drawRoute(rt);
     out.innerHTML =
@@ -137,8 +145,14 @@
     compute();
   }
   function initMap() {
-    map = L.map("map", { zoomControl:true }).setView([41.66, -82.82], 10);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:16, attribution:"&copy; OpenStreetMap" }).addTo(map);
+    if (map) return;
+    map = L.map("map", { zoomControl: true, fadeAnimation: false }).setView([41.66, -82.82], 10);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 16,
+      attribution: "&copy; OpenStreetMap",
+      updateWhenIdle: false,
+      keepBuffer: 2
+    }).addTo(map);
     islandLayer = L.layerGroup().addTo(map);
     routeLayer = L.layerGroup().addTo(map);
     wpLayer = L.layerGroup().addTo(map);
@@ -146,14 +160,28 @@
     CMG_POIS.forEach((p) => {
       L.marker([p.lat, p.lon], { icon: L.divIcon({ className:"poi-div", html: p.name.split(" ")[0] }) }).addTo(map).on("click", () => addWp({ lat:p.lat, lon:p.lon, name:p.name }));
     });
+    window.addEventListener("resize", resizeMap);
   }
-  document.addEventListener("DOMContentLoaded", async () => {
-    loadPrefs(); renderBoatOptions(); bindSetup(); initMap(); await loadLake();
+  function openChart() {
+    save();
+    showSetup(false);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(async function () {
+        initMap();
+        resizeMap();
+        await loadLake();
+        resizeMap();
+        refreshWind();
+      });
+    });
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    loadPrefs(); renderBoatOptions(); bindSetup();
     const s = document.getElementById("poi");
     s.innerHTML = '<option value="">Add a listed mark…</option>';
     CMG_POIS.forEach((p) => { const o = document.createElement("option"); o.value = p.id; o.textContent = p.name; s.appendChild(o); });
     s.onchange = () => { const p = CMG_POIS.find((x) => x.id === s.value); if (p) addWp({ lat:p.lat, lon:p.lon, name:p.name }); s.value = ""; };
-    document.getElementById("openChart").onclick = () => { save(); showSetup(false); refreshWind(); };
+    document.getElementById("openChart").onclick = openChart;
     document.getElementById("editSetup").onclick = () => showSetup(true);
     document.getElementById("boat").onchange = (e) => { state.boatId = e.target.value; document.getElementById("genericWrap").classList.toggle("hidden", state.boatId !== "generic"); bindSetup(); };
     document.getElementById("genericLwl").onchange = (e) => { state.genericLwl = Number(e.target.value) || 23; bindSetup(); };
