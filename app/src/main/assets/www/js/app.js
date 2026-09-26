@@ -6,7 +6,7 @@
     magnetic: false, hybrid: false, tws: 10, twd: 270,
     windPack: null, waypoints: [], lakeRing: null, route: null, lakeReady: false
   };
-  let map, routeLayer, wpLayer, islandLayer;
+  let map, routeLayer, wpLayer, islandLayer, windLayer;
 
   function boat() {
     return state.boatId === "generic" ? CMGPolars.genericClass(state.genericLwl) : CMGPolars.CLASSES[state.boatId];
@@ -100,11 +100,81 @@
         .addTo(routeLayer).bindTooltip(fmtCrs(s.course) + " · " + s.dist.toFixed(2) + " nm · TWA " + Math.round(s.twa) + "° · " + (s.mode==="motor" ? "motor 4 kn" : s.bsp.toFixed(1)+" kn"));
     });
   }
+  function windAtHours(hFromNow) {
+    if (state.windPack) {
+      const w = CMGWind.atTime(state.windPack, Date.now() + hFromNow * 3600000);
+      if (w && w.twd != null) return { tws: w.tws, twd: w.twd, clock: w.time };
+    }
+    return { tws: state.tws, twd: state.twd, clock: null };
+  }
+  function placeWindArrow(lat, lon, hours, w) {
+    const from = CMGGeo.wrap360(w.twd);
+    const to = CMGGeo.wrap360(from + 180);
+    const rot = to;
+    const when = hours < 0.05 ? "now" : "+" + Math.round(hours) + "h";
+    const html =
+      '<div class="wind-vec">' +
+        '<div class="rot" style="transform:rotate(' + rot + 'deg)">' +
+          '<div class="head"></div><div class="shaft"></div>' +
+        '</div>' +
+        '<div class="lab">' + when + ' FROM ' + String(Math.round(from)).padStart(3,"0") + '°</div>' +
+      '</div>';
+    L.marker([lat, lon], {
+      icon: L.divIcon({ className: "wind-mark", html: html, iconSize: [48, 60], iconAnchor: [24, 22] }),
+      interactive: true,
+      keyboard: false
+    }).addTo(windLayer).bindTooltip(
+      when + " · wind FROM " + String(Math.round(from)).padStart(3,"0") + "°T · " +
+      (w.tws != null ? Number(w.tws).toFixed(0) + " kn" : "") +
+      " · blowing toward " + String(Math.round(to)).padStart(3,"0") + "°" +
+      (w.clock ? " · " + String(w.clock).slice(11,16) : "")
+    );
+  }
+  function drawWindArrows(rt) {
+    if (!windLayer) return;
+    windLayer.clearLayers();
+    if (!rt || !rt.segs.length) return;
+    const total = isFinite(rt.tHours) ? rt.tHours : 0;
+    const step = total > 10 ? 2 : 1;
+    const marks = [];
+    function addMark(h, lat, lon) {
+      const hh = Math.round(h * 10) / 10;
+      if (marks.some((m) => Math.abs(m.h - hh) < 0.2)) return;
+      marks.push({ h: hh, lat, lon });
+    }
+    addMark(0, rt.segs[0].from.lat, rt.segs[0].from.lon);
+    let acc = 0;
+    rt.segs.forEach((s) => {
+      const h = isFinite(s.hours) ? s.hours : 0;
+      const start = acc;
+      const end = acc + h;
+      for (let t = step; t < end + 1e-6; t += step) {
+        if (t + 1e-6 < start) continue;
+        const frac = h > 0 ? (t - start) / h : 1;
+        const f = Math.max(0, Math.min(1, frac));
+        addMark(t, s.from.lat + (s.to.lat - s.from.lat) * f, s.from.lon + (s.to.lon - s.from.lon) * f);
+      }
+      const w0 = windAtHours(start);
+      const w1 = windAtHours(end);
+      if (w0 && w1 && CMGGeo.angleDiff(w0.twd, w1.twd) >= 20 && h > 0.4) {
+        addMark(start + h / 2, (s.from.lat + s.to.lat) / 2, (s.from.lon + s.to.lon) / 2);
+      }
+      acc = end;
+    });
+    marks.sort((a, b) => a.h - b.h);
+    marks.forEach((m) => placeWindArrow(m.lat, m.lon, m.h, windAtHours(m.h)));
+  }
   function compute() {
     const out = document.getElementById("stats");
-    if (!map || state.waypoints.length < 2) { state.route = null; if (routeLayer) routeLayer.clearLayers(); out.innerHTML = ""; return; }
+    if (!map || state.waypoints.length < 2) {
+      state.route = null;
+      if (routeLayer) routeLayer.clearLayers();
+      if (windLayer) windLayer.clearLayers();
+      out.innerHTML = "";
+      return;
+    }
     const rt = CMGRoute.buildRoute(state.waypoints, boat(), state.tws, state.twd, state.lakeRing, window.CMG_ISLANDS, state.hybrid);
-    state.route = rt; drawRoute(rt);
+    state.route = rt; drawRoute(rt); drawWindArrows(rt);
     out.innerHTML =
       '<div class="stat"><b>' + rt.totalNm.toFixed(1) + '</b><span>nm sailed</span></div>' +
       '<div class="stat"><b>' + fmtHrs(rt.tHours) + '</b><span>P50 ETA</span></div>' +
@@ -121,7 +191,11 @@
   async function refreshWind() {
     const src = state.windSource;
     const el = document.getElementById("windLabel");
-    if (src === "manual") { el.textContent = "Manual " + state.tws + " kn from " + String(Math.round(state.twd)).padStart(3,"0") + "°"; compute(); return; }
+    if (src === "manual") {
+      el.textContent = "Manual " + state.tws + " kn FROM " + String(Math.round(state.twd)).padStart(3,"0") + "° (direction wind comes from)";
+      compute();
+      return;
+    }
     el.textContent = "Fetching " + src + "…";
     try {
       const pack = await CMGWind.fetchForecast(map.getCenter().lat, map.getCenter().lng, src);
@@ -131,7 +205,8 @@
         state.tws = now.tws; state.twd = now.twd;
         document.getElementById("tws").value = Math.round(state.tws * 10) / 10;
         document.getElementById("twd").value = Math.round(state.twd);
-        el.textContent = src.toUpperCase() + " " + now.tws.toFixed(0) + " kn from " + String(Math.round(now.twd)).padStart(3,"0") + "° @ " + (now.time || "").slice(11,16);
+        el.textContent = src.toUpperCase() + " " + now.tws.toFixed(0) + " kn FROM " +
+          String(Math.round(now.twd)).padStart(3,"0") + "° @ " + (now.time || "").slice(11,16);
       }
     } catch (e) {
       const cached = CMGWind.loadCache();
@@ -139,7 +214,7 @@
         state.windPack = cached;
         const now = CMGWind.atTime(cached, Date.now());
         if (now) { state.tws = now.tws; state.twd = now.twd; }
-        el.textContent = "Cached wind " + state.tws.toFixed(0) + " kn from " + Math.round(state.twd) + "°";
+        el.textContent = "Cached wind " + state.tws.toFixed(0) + " kn FROM " + Math.round(state.twd) + "°";
       } else el.textContent = "Wind fetch failed — using manual";
     }
     compute();
@@ -148,14 +223,12 @@
     if (map) return;
     map = L.map("map", { zoomControl: true, fadeAnimation: false }).setView([41.66, -82.82], 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 16,
-      attribution: "&copy; OpenStreetMap",
-      updateWhenIdle: false,
-      keepBuffer: 2
+      maxZoom: 16, attribution: "&copy; OpenStreetMap", updateWhenIdle: false, keepBuffer: 2
     }).addTo(map);
     islandLayer = L.layerGroup().addTo(map);
     routeLayer = L.layerGroup().addTo(map);
     wpLayer = L.layerGroup().addTo(map);
+    windLayer = L.layerGroup().addTo(map);
     map.on("click", (e) => addWp({ lat:e.latlng.lat, lon:e.latlng.lng, name:"Tap " + (state.waypoints.length + 1) }));
     CMG_POIS.forEach((p) => {
       L.marker([p.lat, p.lon], { icon: L.divIcon({ className:"poi-div", html: p.name.split(" ")[0] }) }).addTo(map).on("click", () => addWp({ lat:p.lat, lon:p.lon, name:p.name }));
