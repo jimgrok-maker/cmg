@@ -13,14 +13,17 @@
     <header>
       <div>
         <div class="brand">CMG</div>
-        <div class="sub">Course Made Good</div>
+        <div class="sub" id="headerSub">Course Made Good</div>
       </div>
       <div style="flex:1"></div>
       <button type="button" id="editSetup">Setup</button>
     </header>
     <section id="setup" class="sheet">
-      <h2>Lake Erie</h2>
-      <div class="row">
+      <h2 id="setupTitle">Water</h2>
+      <label>Lake or bay
+        <select id="lake"></select>
+      </label>
+      <div class="row" style="margin-top:0.45rem">
         <label>Wind source
           <select id="windSource">
             <option value="hrrr">HRRR (default)</option>
@@ -32,7 +35,7 @@
         <label>Depth chart
           <select id="depth">
             <option value="noaa">NOAA ENC / BlueTopo — shoreline only</option>
-            <option value="chs">CHS note (Pelee / Middle Is.) — shoreline only</option>
+            <option value="chs">CHS note — shoreline only</option>
           </select>
         </label>
       </div>
@@ -46,9 +49,9 @@
       </div>
       <p id="boatMeta" class="disclaimer"></p>
       <label style="margin-top:0.4rem;flex-direction:row;align-items:center;gap:0.45rem;text-transform:none">
-        <input type="checkbox" id="mag" /> Magnetic courses (Var 7.6°W)
+        <input type="checkbox" id="mag" /> Magnetic courses (<span id="varLabel">Var 7.6°W</span>)
       </label>
-      <div class="chip">Check official NOAA / CHS chart for depths. CMG stays inside the shoreline. Planning aid — not a chartplotter.</div>
+      <div class="chip">Check official NOAA / CHS chart for depths. CMG stays inside a coarse shoreline. Planning aid — not a chartplotter. Island routing is detailed on Erie first.</div>
       <button class="primary" id="openChart" style="width:100%;margin-top:0.4rem">Open chart</button>
     </section>
     <div id="planner" class="hidden">
@@ -77,11 +80,12 @@
         </div>
         <div class="stats" id="stats"></div>
         <p id="routeWarn" class="chip hidden"></p>
-        <p class="disclaimer">TWD is FROM. Gold tags sit downwind of the rhumb. Track color uses that hour’s forecast. Board down, ballast full on the 26X.</p>
+        <p class="disclaimer">TWD is FROM. Gold tags sit downwind of the rhumb. Track color uses that hour’s forecast.</p>
       </section>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="data/lakes.js"></script>
   <script src="data/islands.js"></script>
   <script src="js/pois.js"></script>
   <script src="js/geo.js"></script>
