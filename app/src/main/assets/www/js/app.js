@@ -43,6 +43,12 @@
     const d = state.magnetic ? CMGGeo.wrap360(trueDeg + lake().variationW) : trueDeg;
     return String(Math.round(d)).padStart(3, "0") + "°" + (state.magnetic ? "M" : "T");
   }
+  function setHud(spd, ttd) {
+    const s = document.getElementById("hudSpd");
+    const t = document.getElementById("hudTtd");
+    if (s) s.textContent = spd;
+    if (t) t.textContent = ttd;
+  }
   function showSetup(on) {
     document.getElementById("setup").classList.toggle("hidden", !on);
     document.getElementById("planner").classList.toggle("hidden", on);
@@ -165,22 +171,14 @@
     const from = CMGGeo.wrap360(w.twd);
     const to = CMGGeo.wrap360(from + 180);
     const when = hours < 0.05 ? "now" : "+" + Math.round(hours) + "h";
-    const tip = when + " · wind FROM " + String(Math.round(from)).padStart(3,"0") + "°T · " +
-      (w.tws != null ? Number(w.tws).toFixed(0) + " kn" : "") +
+    const lab = when + " FROM " + String(Math.round(from)).padStart(3,"0") + "°";
+    const tip = lab + (w.tws != null ? " · " + Number(w.tws).toFixed(0) + " kn" : "") +
       " · blowing toward " + String(Math.round(to)).padStart(3,"0") + "°" +
       (w.clock ? " · " + String(w.clock).slice(11,16) : "");
+    const html = '<div class="wind-stack">' + windBarbSvg(to) + '<div class="wind-lab">' + lab + "</div></div>";
     L.marker([lat, lon], {
-      icon: L.divIcon({ className: "wind-mark", html: windBarbSvg(to), iconSize: [36, 36], iconAnchor: [18, 18] }),
+      icon: L.divIcon({ className: "wind-mark", html: html, iconSize: [92, 58], iconAnchor: [46, 18] }),
       interactive: true, keyboard: false, zIndexOffset: 400
-    }).addTo(windLayer).bindTooltip(tip);
-    const off = CMGGeo.destPoint({ lat: lat, lon: lon }, to, 0.55);
-    L.marker([off.lat, off.lon], {
-      icon: L.divIcon({
-        className: "wind-mark",
-        html: '<div class="wind-lab">' + when + " FROM " + String(Math.round(from)).padStart(3,"0") + "°</div>",
-        iconSize: [86, 18], iconAnchor: [43, 9]
-      }),
-      interactive: true, keyboard: false, zIndexOffset: 401
     }).addTo(windLayer).bindTooltip(tip);
   }
   function drawWindArrows(rt) {
@@ -219,6 +217,7 @@
       if (routeLayer) routeLayer.clearLayers();
       if (windLayer) windLayer.clearLayers();
       out.innerHTML = "";
+      setHud("—", "—");
       return;
     }
     const rt = CMGRoute.buildRoute(
@@ -226,6 +225,8 @@
       state.lakeRing, state.islands, state.hybrid, windAtHours
     );
     state.route = rt; drawRoute(rt); drawWindArrows(rt);
+    const avg = (isFinite(rt.tHours) && rt.tHours > 0) ? (rt.totalNm / rt.tHours) : 0;
+    setHud(avg ? avg.toFixed(1) : "—", fmtHrs(rt.tHours));
     out.innerHTML =
       '<div class="stat"><b>' + rt.totalNm.toFixed(1) + '</b><span>nm sailed</span></div>' +
       '<div class="stat"><b>' + fmtHrs(rt.tHours) + '</b><span>P50 ETA</span></div>' +
@@ -293,6 +294,7 @@
     if (routeLayer) routeLayer.clearLayers();
     if (windLayer) windLayer.clearLayers();
     drawWaypoints(); renderWpList();
+    setHud("—", "—");
     bindSetup();
     if (map) applyLake();
   }
