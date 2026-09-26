@@ -16,7 +16,7 @@ header {
 }
 header .brand { font-weight: 700; letter-spacing: 0.12em; font-size: 0.95rem; }
 header .sub { color: var(--muted); font-size: 0.7rem; }
-header button { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 0.28rem 0.5rem; font-size: 0.78rem; }
+header button { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 0.28rem 0.5rem; font-size: 0.78rem; width: auto; min-height: 0; }
 #planner { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 #mapWrap { position: relative; flex: 1 1 auto; min-height: 220px; background: #0b1c22; }
 #map { position: absolute; inset: 0; }
@@ -26,14 +26,20 @@ header button { background: var(--panel); color: var(--ink); border: 1px solid v
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
 .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.45rem; }
 label { display: flex; flex-direction: column; gap: 0.18rem; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-select, input, button.primary, button.ghost {
+select, input[type="text"], input[type="number"], button.primary, button.ghost {
   font: inherit; color: var(--ink); background: #101816; border: 1px solid var(--line); border-radius: 6px; padding: 0.42rem 0.5rem;
   width: 100%; min-height: 42px; color-scheme: dark;
 }
 select { -webkit-appearance: menulist; appearance: menulist; }
 select option { color: #e7efe8; background: #101816; }
+input[type="checkbox"] {
+  width: 18px; height: 18px; min-height: 18px; min-width: 18px;
+  margin: 0; padding: 0; flex: 0 0 18px;
+  accent-color: var(--accent);
+  background: transparent; border: 0;
+}
 button.primary { background: var(--accent); color: #07140d; font-weight: 700; border: 0; }
-button.ghost { background: transparent; width: auto; }
+button.ghost { background: transparent; width: auto; min-height: 32px; }
 .chip { font-size: 0.72rem; color: #d7c28a; background: #2a2414; border: 1px solid #4a3e22; border-radius: 4px; padding: 0.35rem 0.5rem; margin: 0.4rem 0; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; margin-top: 0.5rem; }
 .stat { background: #101816; border: 1px solid var(--line); border-radius: 6px; padding: 0.4rem; }
