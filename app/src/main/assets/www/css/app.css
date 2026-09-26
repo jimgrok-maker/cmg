@@ -48,17 +48,15 @@ button.ghost { background: transparent; }
 }
 .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 3px; }
 .wind-mark { background: none; border: 0; }
-.wind-vec { width: 22px; height: 28px; display: flex; align-items: center; justify-content: center; }
-.wind-vec .rot { width: 14px; height: 22px; display: flex; flex-direction: column; align-items: center; transform-origin: 50% 50%; }
-.wind-vec .head {
-  width: 0; height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 8px solid #d4b24a;
+.wind-vec {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 1px 2px rgba(0,0,0,0.55));
 }
-.wind-vec .shaft { width: 2px; height: 12px; background: #d4b24a; }
+.wind-vec svg { width: 32px; height: 32px; display: block; }
 .wind-lab {
-  font-size: 9px; line-height: 1.1; text-align: center;
-  color: #1c1810; background: #d4b24a;
-  border-radius: 3px; padding: 1px 3px; white-space: nowrap;
+  font-size: 10px; font-weight: 700; line-height: 1.15; text-align: center;
+  color: #0e120c; background: #f0d060;
+  border: 1px solid #fff; border-radius: 4px; padding: 2px 5px; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
 }
