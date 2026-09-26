@@ -15,29 +15,44 @@
     if (a < 165) return "#c9b23a";
     return "#8a6b3a";
   }
-  function estimateTackPoint(from, to, firstCourse, secondCourse, dist) {
-    const step = Math.max(0.15, dist / 24);
+  function segmentWet(a, b, lakeRing, islands) {
+    if (!CMGGeo.onWater(a, lakeRing, islands) || !CMGGeo.onWater(b, lakeRing, islands)) return false;
+    const dist = CMGGeo.haversineNm(a, b);
+    const samples = CMGGeo.samplesOnSegment(a, b, Math.max(6, Math.ceil(dist * 10)));
+    for (const s of samples) {
+      if (!CMGGeo.onWater(s, lakeRing, islands)) return false;
+    }
+    return true;
+  }
+  function estimateTackPoint(from, to, firstCourse, secondCourse, dist, lakeRing, islands) {
+    const step = Math.max(0.12, dist / 36);
     let best = null, bestErr = 1e9;
-    for (let d = step; d < dist * 1.6; d += step) {
+    for (let d = step; d < dist * 1.8; d += step) {
       const p = CMGGeo.destPoint(from, firstCourse, d);
+      if (!CMGGeo.onWater(p, lakeRing, islands)) continue;
+      if (!segmentWet(from, p, lakeRing, islands)) continue;
+      if (!segmentWet(p, to, lakeRing, islands)) continue;
       const err = CMGGeo.angleDiff(CMGGeo.initialBearing(p, to), secondCourse);
       if (err < bestErr) { bestErr = err; best = p; }
       if (err < 3) break;
     }
-    if (!best || bestErr > 18) return null;
+    if (!best || bestErr > 22) return null;
     return best;
   }
-  function beatToMark(from, to, cls, tws, twd) {
+  function beatToMark(from, to, cls, tws, twd, lakeRing, islands) {
     const destBrg = CMGGeo.initialBearing(from, to);
     if (Math.abs(twaForCourse(twd, destBrg)) >= NOGO) return null;
     const opt = CMGPolars.bestUpwindTwa(cls, tws);
     const stbd = CMGGeo.wrap360(twd + opt);
     const port = CMGGeo.wrap360(twd - opt);
-    const useStbd = CMGGeo.angleDiff(stbd, destBrg) <= CMGGeo.angleDiff(port, destBrg);
-    const first = useStbd ? stbd : port;
-    const second = useStbd ? port : stbd;
-    const tack = estimateTackPoint(from, to, first, second, CMGGeo.haversineNm(from, to));
-    return tack ? [tack] : null;
+    const dist = CMGGeo.haversineNm(from, to);
+    const stbdFirst = estimateTackPoint(from, to, stbd, port, dist, lakeRing, islands);
+    const portFirst = estimateTackPoint(from, to, port, stbd, dist, lakeRing, islands);
+    if (!stbdFirst && !portFirst) return null;
+    if (stbdFirst && !portFirst) return [stbdFirst];
+    if (portFirst && !stbdFirst) return [portFirst];
+    const preferStbd = CMGGeo.angleDiff(stbd, destBrg) <= CMGGeo.angleDiff(port, destBrg);
+    return [preferStbd ? stbdFirst : portFirst];
   }
   function evaluateSegment(a, b, cls, tws, twd, lakeRing, islands) {
     const course = CMGGeo.initialBearing(a, b);
@@ -49,9 +64,7 @@
     const toward = bsp;
     const hours = bsp > 0.15 ? dist / bsp : Infinity;
     const motorOffered = toward < 2 || !isFinite(hours);
-    let land = false;
-    const samples = CMGGeo.samplesOnSegment(a, b, Math.max(4, Math.ceil(dist * 8)));
-    for (const s of samples) { if (!CMGGeo.onWater(s, lakeRing, islands)) { land = true; break; } }
+    const land = !segmentWet(a, b, lakeRing, islands);
     return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, color: colorForTwa(twa), twd: twd, tws: tws };
   }
   function splitByHour(a, b, cls, lakeRing, islands, hybrid, startHours, windAtFn, fallback) {
@@ -93,7 +106,7 @@
     for (let i = 0; i < path.length - 1; i++) {
       const a = path[i], b = path[i+1];
       if (Math.abs(twaForCourse(twd, CMGGeo.initialBearing(a, b))) < NOGO) {
-        const extra = beatToMark(a, b, cls, tws, twd);
+        const extra = beatToMark(a, b, cls, tws, twd, lakeRing, islands);
         if (extra) extra.forEach((p) => expanded.push(p));
       }
       expanded.push(b);
