@@ -46,3 +46,26 @@ button.ghost { background: transparent; }
   border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.68rem; pointer-events: none;
 }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+.wind-mark { background: none; border: 0; }
+.wind-vec {
+  width: 44px; height: 58px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+}
+.wind-vec .rot {
+  width: 20px; height: 28px;
+  display: flex; flex-direction: column; align-items: center;
+  transform-origin: 50% 50%;
+}
+.wind-vec .head {
+  width: 0; height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 11px solid #d4b24a;
+}
+.wind-vec .shaft { width: 3px; height: 16px; background: #d4b24a; }
+.wind-vec .lab {
+  margin-top: 2px;
+  font-size: 9px; line-height: 1.15; text-align: center;
+  color: #1c1810; background: #d4b24a;
+  border-radius: 3px; padding: 1px 3px; white-space: nowrap;
+}
