@@ -111,6 +111,15 @@
     }
     return { tws: state.tws, twd: state.twd, clock: null };
   }
+  function windBarbSvg(rotDeg) {
+    return '<div class="wind-vec"><svg viewBox="0 0 32 32" style="transform:rotate(' + rotDeg + 'deg)">' +
+      '<circle cx="16" cy="16" r="14" fill="#111814" fill-opacity="0.35"/>' +
+      '<polygon points="16,3 24,16 16,12 8,16" fill="#1a1f18" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>' +
+      '<rect x="14.2" y="12" width="3.6" height="14" rx="1" fill="#1a1f18" stroke="#fff" stroke-width="1.6"/>' +
+      '<line x1="16" y1="26" x2="24" y2="30" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>' +
+      '<line x1="16" y1="26" x2="23" y2="26.8" stroke="#f0d060" stroke-width="2" stroke-linecap="round"/>' +
+      '</svg></div>';
+  }
   function placeWindArrow(lat, lon, hours, w) {
     const from = CMGGeo.wrap360(w.twd);
     const to = CMGGeo.wrap360(from + 180);
@@ -120,21 +129,18 @@
       (w.tws != null ? Number(w.tws).toFixed(0) + " kn" : "") +
       " · blowing toward " + String(Math.round(to)).padStart(3,"0") + "°" +
       (w.clock ? " · " + String(w.clock).slice(11,16) : "");
-    const arrowHtml =
-      '<div class="wind-vec"><div class="rot" style="transform:rotate(' + to + 'deg)">' +
-      '<div class="head"></div><div class="shaft"></div></div></div>';
     L.marker([lat, lon], {
-      icon: L.divIcon({ className: "wind-mark", html: arrowHtml, iconSize: [22, 28], iconAnchor: [11, 14] }),
-      interactive: true, keyboard: false
+      icon: L.divIcon({ className: "wind-mark", html: windBarbSvg(to), iconSize: [36, 36], iconAnchor: [18, 18] }),
+      interactive: true, keyboard: false, zIndexOffset: 400
     }).addTo(windLayer).bindTooltip(tip);
-    const off = CMGGeo.destPoint({ lat: lat, lon: lon }, to, 0.42);
+    const off = CMGGeo.destPoint({ lat: lat, lon: lon }, to, 0.55);
     L.marker([off.lat, off.lon], {
       icon: L.divIcon({
         className: "wind-mark",
-        html: '<div class="wind-lab">' + when + " " + String(Math.round(from)).padStart(3,"0") + "°</div>",
-        iconSize: [64, 16], iconAnchor: [32, 8]
+        html: '<div class="wind-lab">' + when + " FROM " + String(Math.round(from)).padStart(3,"0") + "°</div>",
+        iconSize: [86, 18], iconAnchor: [43, 9]
       }),
-      interactive: true, keyboard: false
+      interactive: true, keyboard: false, zIndexOffset: 401
     }).addTo(windLayer).bindTooltip(tip);
   }
   function drawWindArrows(rt) {
