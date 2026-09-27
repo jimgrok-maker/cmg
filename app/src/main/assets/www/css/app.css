@@ -11,19 +11,20 @@
 html, body { margin: 0; height: 100%; height: 100dvh; background: var(--bg); color: var(--ink); }
 #app { display: flex; flex-direction: column; height: 100%; }
 header {
-  display: flex; align-items: center; gap: 0.45rem;
-  padding: 0.4rem 0.55rem; background: #101816; border-bottom: 1px solid var(--line); z-index: 500; flex-shrink: 0;
+  display: flex; align-items: center; gap: 0.35rem;
+  padding: 0.35rem 0.5rem; background: #101816; border-bottom: 1px solid var(--line); z-index: 500; flex-shrink: 0;
 }
-header .brand { font-weight: 700; letter-spacing: 0.12em; font-size: 0.95rem; }
-header .sub { color: var(--muted); font-size: 0.7rem; }
-header button { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 0.28rem 0.5rem; font-size: 0.78rem; width: auto; min-height: 0; }
-.hud { display: flex; gap: 0.35rem; flex: 1; justify-content: center; }
+header .brand { font-weight: 700; letter-spacing: 0.12em; font-size: 0.9rem; }
+header .sub { color: var(--muted); font-size: 0.65rem; }
+header button { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 0.28rem 0.45rem; font-size: 0.75rem; width: auto; min-height: 0; }
+.hud { display: flex; gap: 0.28rem; flex: 1; justify-content: center; }
 .hud-tab {
   background: #15221c; border: 1px solid var(--line); border-radius: 8px;
-  padding: 0.18rem 0.5rem; min-width: 4.4rem; text-align: center;
+  padding: 0.14rem 0.38rem; min-width: 3.6rem; text-align: center;
 }
-.hud-tab b { display: block; font-size: 0.92rem; line-height: 1.15; }
-.hud-tab span { font-size: 0.58rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.hud-tab.live { border-color: #3d9a6a; }
+.hud-tab b { display: block; font-size: 0.88rem; line-height: 1.15; }
+.hud-tab span { font-size: 0.54rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
 #planner { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 #mapWrap { position: relative; flex: 1 1 auto; min-height: 220px; background: #0b1c22; }
 #map { position: absolute; inset: 0; }
