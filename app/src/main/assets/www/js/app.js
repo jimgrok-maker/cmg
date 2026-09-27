@@ -4,11 +4,12 @@
   const state = {
     lakeId: "erie", windSource: "hrrr", depth: "noaa", boatId: "mac26x", genericLwl: 23,
     magnetic: false, hybrid: false, tws: 10, twd: 270,
-    windPack: null, waypoints: [], lakeRing: null, islands: [], route: null, outline: null
+    windPack: null, windField: null, waypoints: [], lakeRing: null, islands: [], route: null, outline: null
   };
   let map, routeLayer, wpLayer, islandLayer, windLayer, poiLayer;
   let lastFix = null, boatMark = null, gpsWatch = null, trackLine = null;
   let gpsTrack = [];
+  let fieldBusy = false;
 
   function lake() {
     if (typeof CMGLakeById === "function") return CMGLakeById(state.lakeId);
@@ -122,6 +123,12 @@
     document.getElementById("setup").classList.toggle("hidden", !on);
     document.getElementById("planner").classList.toggle("hidden", on);
   }
+  function showFaq(on) {
+    document.getElementById("setupPane").classList.toggle("hidden", on);
+    document.getElementById("faqPane").classList.toggle("hidden", !on);
+    document.getElementById("tabSetup").classList.toggle("on", !on);
+    document.getElementById("tabFaq").classList.toggle("on", on);
+  }
   function fillLakes() {
     const sel = document.getElementById("lake");
     if (!sel.options.length && window.CMG_LAKES) {
@@ -221,12 +228,50 @@
         );
     });
   }
-  function windAtHours(hFromNow) {
+  function windAtHours(hFromNow, pt) {
+    const when = Date.now() + hFromNow * 3600000;
+    if (state.windField && state.windField.length && pt) {
+      const w = CMGWind.atPlace(state.windField, pt.lat, pt.lon, when);
+      if (w && w.twd != null) return { tws: w.tws, twd: w.twd, clock: w.time };
+    }
     if (state.windPack) {
-      const w = CMGWind.atTime(state.windPack, Date.now() + hFromNow * 3600000);
+      const w = CMGWind.atTime(state.windPack, when);
       if (w && w.twd != null) return { tws: w.tws, twd: w.twd, clock: w.time };
     }
     return { tws: state.tws, twd: state.twd, clock: null };
+  }
+  function sampleRoutePoints(rt) {
+    const pts = [];
+    function add(lat, lon) {
+      if (pts.some(function (p) { return CMGGeo.haversineNm(p, { lat: lat, lon: lon }) < 3; })) return;
+      pts.push({ lat: lat, lon: lon });
+    }
+    if (!rt || !rt.segs.length) return pts;
+    add(rt.segs[0].from.lat, rt.segs[0].from.lon);
+    rt.segs.forEach(function (s) {
+      add(s.from.lat, s.from.lon);
+      add(s.to.lat, s.to.lon);
+    });
+    return pts.slice(0, 12);
+  }
+  async function refineWindField(rt) {
+    if (fieldBusy || state.windSource === "manual" || !rt) return;
+    const pts = sampleRoutePoints(rt);
+    if (pts.length < 2) return;
+    fieldBusy = true;
+    const el = document.getElementById("windLabel");
+    if (el) el.textContent = (el.textContent || "") + " · sampling " + pts.length + " cells…";
+    try {
+      const field = await CMGWind.fetchMany(pts, state.windSource, lake().tz);
+      if (field && field.length) {
+        state.windField = field;
+        compute(true);
+        if (el && el.textContent.indexOf("cells") >= 0) {
+          el.textContent = el.textContent.replace(/ · sampling \d+ cells…/, " · " + field.length + " cells along track");
+        }
+      }
+    } catch (e) {}
+    fieldBusy = false;
   }
   function windBarbSvg(rotDeg) {
     return '<div class="wind-vec"><svg viewBox="0 0 32 32" style="transform:rotate(' + rotDeg + 'deg)">' +
@@ -278,9 +323,9 @@
       acc = end;
     });
     marks.sort(function (a, b) { return a.h - b.h; });
-    marks.forEach(function (m) { placeWindArrow(m.lat, m.lon, m.h, windAtHours(m.h)); });
+    marks.forEach(function (m) { placeWindArrow(m.lat, m.lon, m.h, windAtHours(m.h, m)); });
   }
-  function compute() {
+  function compute(skipRefine) {
     const out = document.getElementById("stats");
     if (!map || state.waypoints.length < 2) {
       state.route = null;
@@ -309,10 +354,12 @@
     if (rt.motorUsed) warn.push("VMG < 2 kn on a leg; motor at 4 kn used in hybrid compare.");
     const rw = document.getElementById("routeWarn");
     rw.innerHTML = warn.join(" "); rw.classList.toggle("hidden", warn.length === 0);
+    if (!skipRefine && !state.windField) refineWindField(rt);
   }
   async function refreshWind() {
     const src = state.windSource;
     const el = document.getElementById("windLabel");
+    state.windField = null;
     if (src === "manual") {
       el.textContent = "Manual " + state.tws + " kn FROM " + String(Math.round(state.twd)).padStart(3,"0") + "°";
       compute();
@@ -362,6 +409,7 @@
     state.lakeId = id;
     state.waypoints = [];
     state.route = null;
+    state.windField = null;
     if (routeLayer) routeLayer.clearLayers();
     if (windLayer) windLayer.clearLayers();
     drawWaypoints(); renderWpList();
@@ -392,6 +440,8 @@
     };
     document.getElementById("openChart").onclick = openChart;
     document.getElementById("editSetup").onclick = function () { showSetup(true); };
+    document.getElementById("tabSetup").onclick = function () { showFaq(false); };
+    document.getElementById("tabFaq").onclick = function () { showFaq(true); };
     document.getElementById("lake").onchange = function (e) { changeLake(e.target.value); };
     document.getElementById("boat").onchange = function (e) {
       state.boatId = e.target.value;
@@ -399,13 +449,13 @@
       bindSetup();
     };
     document.getElementById("genericLwl").onchange = function (e) { state.genericLwl = Number(e.target.value) || 23; bindSetup(); };
-    document.getElementById("windSource").onchange = function (e) { state.windSource = e.target.value; };
+    document.getElementById("windSource").onchange = function (e) { state.windSource = e.target.value; state.windField = null; };
     document.getElementById("depth").onchange = function (e) { state.depth = e.target.value; };
     document.getElementById("mag").onchange = function (e) { state.magnetic = e.target.checked; compute(); };
-    document.getElementById("tws").oninput = function (e) { state.tws = Number(e.target.value); compute(); };
-    document.getElementById("twd").oninput = function (e) { state.twd = Number(e.target.value); compute(); };
-    document.getElementById("hybrid").onchange = function (e) { state.hybrid = e.target.checked; compute(); };
-    document.getElementById("clearWp").onclick = function () { state.waypoints = []; drawWaypoints(); renderWpList(); compute(); };
+    document.getElementById("tws").oninput = function (e) { state.tws = Number(e.target.value); compute(true); };
+    document.getElementById("twd").oninput = function (e) { state.twd = Number(e.target.value); compute(true); };
+    document.getElementById("hybrid").onchange = function (e) { state.hybrid = e.target.checked; compute(true); };
+    document.getElementById("clearWp").onclick = function () { state.waypoints = []; state.windField = null; drawWaypoints(); renderWpList(); compute(); };
     document.getElementById("clearTrack").onclick = clearTrack;
     document.getElementById("tws").value = state.tws;
     document.getElementById("twd").value = state.twd;
