@@ -1,12 +1,14 @@
 (function () {
   const STORE = "cmg.v1";
+  const TRACK_STORE = "cmg.track.v1";
   const state = {
     lakeId: "erie", windSource: "hrrr", depth: "noaa", boatId: "mac26x", genericLwl: 23,
     magnetic: false, hybrid: false, tws: 10, twd: 270,
     windPack: null, waypoints: [], lakeRing: null, islands: [], route: null, outline: null
   };
   let map, routeLayer, wpLayer, islandLayer, windLayer, poiLayer;
-  let lastFix = null, boatMark = null, gpsWatch = null;
+  let lastFix = null, boatMark = null, gpsWatch = null, trackLine = null;
+  let gpsTrack = [];
 
   function lake() {
     if (typeof CMGLakeById === "function") return CMGLakeById(state.lakeId);
@@ -35,6 +37,15 @@
       if (typeof p.magnetic === "boolean") state.magnetic = p.magnetic;
     } catch (e) {}
   }
+  function loadTrack() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(TRACK_STORE) || "[]");
+      if (Array.isArray(raw)) gpsTrack = raw.filter(function (p) { return p && p.length === 2; }).slice(-4000);
+    } catch (e) { gpsTrack = []; }
+  }
+  function saveTrack() {
+    try { localStorage.setItem(TRACK_STORE, JSON.stringify(gpsTrack.slice(-4000))); } catch (e) {}
+  }
   function fmtHrs(h) {
     if (!isFinite(h)) return "—";
     const m = Math.round(h * 60);
@@ -53,6 +64,31 @@
   function setSog(txt) {
     const el = document.getElementById("hudSog");
     if (el) el.textContent = txt;
+  }
+  function ensureTrackLine() {
+    if (!map) return;
+    if (!trackLine) {
+      trackLine = L.polyline(gpsTrack, { color: "#f0d060", weight: 3.5, opacity: 0.95 }).addTo(map);
+    } else {
+      trackLine.setLatLngs(gpsTrack);
+    }
+  }
+  function appendTrack(lat, lon) {
+    const pt = [lat, lon];
+    if (gpsTrack.length) {
+      const last = gpsTrack[gpsTrack.length - 1];
+      const nm = CMGGeo.haversineNm({ lat: last[0], lon: last[1] }, { lat: lat, lon: lon });
+      if (nm < 0.008) return;
+    }
+    gpsTrack.push(pt);
+    if (gpsTrack.length > 4000) gpsTrack = gpsTrack.slice(-4000);
+    ensureTrackLine();
+    if (gpsTrack.length % 8 === 0) saveTrack();
+  }
+  function clearTrack() {
+    gpsTrack = [];
+    saveTrack();
+    if (trackLine) trackLine.setLatLngs([]);
   }
   function startGps() {
     if (!navigator.geolocation) { setSog("n/a"); return; }
@@ -73,6 +109,7 @@
     }
     lastFix = { lat: lat, lon: lon, t: pos.timestamp };
     setSog(kn == null ? "…" : kn.toFixed(1));
+    appendTrack(lat, lon);
     if (map) {
       if (!boatMark) {
         boatMark = L.circleMarker([lat, lon], { radius: 8, color: "#fff", weight: 2, fillColor: "#3d9a6a", fillOpacity: 1 }).addTo(map).bindTooltip("You");
@@ -148,6 +185,7 @@
         .addTo(poiLayer).on("click", function () { addWp({ lat:p.lat, lon:p.lon, name:p.name }); });
     });
     map.setView(Ldef.center, Ldef.zoom);
+    ensureTrackLine();
   }
   function addWp(pt) {
     state.waypoints.push({ lat: pt.lat, lon: pt.lon, name: pt.name || ("Mark " + (state.waypoints.length + 1)) });
@@ -315,6 +353,7 @@
     routeLayer = L.layerGroup().addTo(map);
     wpLayer = L.layerGroup().addTo(map);
     windLayer = L.layerGroup().addTo(map);
+    ensureTrackLine();
     map.on("click", function (e) { addWp({ lat:e.latlng.lat, lon:e.latlng.lng, name:"Tap " + (state.waypoints.length + 1) }); });
     window.addEventListener("resize", resizeMap);
   }
@@ -344,7 +383,7 @@
     });
   }
   document.addEventListener("DOMContentLoaded", function () {
-    loadPrefs(); fillLakes(); renderBoatOptions(); bindSetup();
+    loadPrefs(); loadTrack(); fillLakes(); renderBoatOptions(); bindSetup();
     startGps();
     document.getElementById("poi").onchange = function () {
       const p = (window.CMG_POIS || []).find(function (x) { return x.id === document.getElementById("poi").value; });
@@ -367,6 +406,7 @@
     document.getElementById("twd").oninput = function (e) { state.twd = Number(e.target.value); compute(); };
     document.getElementById("hybrid").onchange = function (e) { state.hybrid = e.target.checked; compute(); };
     document.getElementById("clearWp").onclick = function () { state.waypoints = []; drawWaypoints(); renderWpList(); compute(); };
+    document.getElementById("clearTrack").onclick = clearTrack;
     document.getElementById("tws").value = state.tws;
     document.getElementById("twd").value = state.twd;
   });
