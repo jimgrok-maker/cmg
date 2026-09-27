@@ -18,11 +18,73 @@
   function segmentWet(a, b, lakeRing, islands) {
     if (!CMGGeo.onWater(a, lakeRing, islands) || !CMGGeo.onWater(b, lakeRing, islands)) return false;
     const dist = CMGGeo.haversineNm(a, b);
-    const samples = CMGGeo.samplesOnSegment(a, b, Math.max(6, Math.ceil(dist * 10)));
+    const samples = CMGGeo.samplesOnSegment(a, b, Math.max(8, Math.ceil(dist * 14)));
     for (const s of samples) {
       if (!CMGGeo.onWater(s, lakeRing, islands)) return false;
     }
     return true;
+  }
+  function ringBounds(ring) {
+    let minLon = 1e9, maxLon = -1e9, minLat = 1e9, maxLat = -1e9;
+    ring.forEach(function (p) {
+      minLon = Math.min(minLon, p[0]); maxLon = Math.max(maxLon, p[0]);
+      minLat = Math.min(minLat, p[1]); maxLat = Math.max(maxLat, p[1]);
+    });
+    return { minLon: minLon, maxLon: maxLon, minLat: minLat, maxLat: maxLat,
+      cLon: (minLon + maxLon) / 2, cLat: (minLat + maxLat) / 2 };
+  }
+  function islandHits(a, b, islands) {
+    const hits = [];
+    (islands || []).forEach(function (isl) {
+      const dist = CMGGeo.haversineNm(a, b);
+      const samples = CMGGeo.samplesOnSegment(a, b, Math.max(8, Math.ceil(dist * 14)));
+      const crossed = samples.some(function (s) { return CMGGeo.pointInRing(s.lon, s.lat, isl.ring); });
+      if (crossed) hits.push(isl);
+    });
+    return hits;
+  }
+  function candidatesFor(isl) {
+    const b = ringBounds(isl.ring);
+    const dLat = 0.014;
+    const dLon = 0.018;
+    return [
+      { lat: b.maxLat + dLat, lon: b.cLon },
+      { lat: b.minLat - dLat, lon: b.cLon },
+      { lat: b.cLat, lon: b.maxLon + dLon },
+      { lat: b.cLat, lon: b.minLon - dLon },
+      { lat: b.maxLat + dLat, lon: b.maxLon + dLon },
+      { lat: b.maxLat + dLat, lon: b.minLon - dLon },
+      { lat: b.minLat - dLat, lon: b.maxLon + dLon },
+      { lat: b.minLat - dLat, lon: b.minLon - dLon }
+    ];
+  }
+  function detourAround(from, to, lakeRing, islands) {
+    if (segmentWet(from, to, lakeRing, islands)) return [];
+    const hits = islandHits(from, to, islands);
+    const list = hits.length ? hits : (islands || []);
+    let bestPts = null, bestLen = 1e9;
+    list.forEach(function (isl) {
+      const cands = candidatesFor(isl).filter(function (p) {
+        return CMGGeo.onWater(p, lakeRing, islands);
+      });
+      cands.forEach(function (p) {
+        if (!segmentWet(from, p, lakeRing, islands) || !segmentWet(p, to, lakeRing, islands)) return;
+        const len = CMGGeo.haversineNm(from, p) + CMGGeo.haversineNm(p, to);
+        if (len < bestLen) { bestLen = len; bestPts = [p]; }
+      });
+      for (let i = 0; i < cands.length; i++) {
+        for (let j = 0; j < cands.length; j++) {
+          if (i === j) continue;
+          const p1 = cands[i], p2 = cands[j];
+          if (!segmentWet(from, p1, lakeRing, islands)) continue;
+          if (!segmentWet(p1, p2, lakeRing, islands)) continue;
+          if (!segmentWet(p2, to, lakeRing, islands)) continue;
+          const len = CMGGeo.haversineNm(from, p1) + CMGGeo.haversineNm(p1, p2) + CMGGeo.haversineNm(p2, to);
+          if (len < bestLen) { bestLen = len; bestPts = [p1, p2]; }
+        }
+      }
+    });
+    return bestPts || [];
   }
   function estimateTackPoint(from, to, firstCourse, secondCourse, dist, lakeRing, islands) {
     const step = Math.max(0.12, dist / 36);
@@ -102,12 +164,18 @@
   function buildRoute(waypoints, cls, tws, twd, lakeRing, islands, hybrid, windAtFn) {
     const fallback = { tws: tws, twd: twd };
     const path = waypoints.slice();
-    const expanded = [path[0]];
+    const wet = [path[0]];
     for (let i = 0; i < path.length - 1; i++) {
-      const a = path[i], b = path[i+1];
+      const a = wet[wet.length - 1], b = path[i + 1];
+      detourAround(a, b, lakeRing, islands).forEach(function (p) { wet.push(p); });
+      wet.push(b);
+    }
+    const expanded = [wet[0]];
+    for (let i = 0; i < wet.length - 1; i++) {
+      const a = expanded[expanded.length - 1], b = wet[i + 1];
       if (Math.abs(twaForCourse(twd, CMGGeo.initialBearing(a, b))) < NOGO) {
         const extra = beatToMark(a, b, cls, tws, twd, lakeRing, islands);
-        if (extra) extra.forEach((p) => expanded.push(p));
+        if (extra) extra.forEach(function (p) { expanded.push(p); });
       }
       expanded.push(b);
     }
@@ -115,7 +183,7 @@
     let tHours = 0, sailNm = 0, motorNm = 0, motorUsed = false, landHit = false, vmg2 = 0, vmg4 = 0, totalNm = 0;
     for (let i = 0; i < expanded.length - 1; i++) {
       const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback);
-      part.segs.forEach((ev) => {
+      part.segs.forEach(function (ev) {
         if (ev.mode === "motor") { motorUsed = true; motorNm += ev.dist; } else sailNm += ev.dist;
         if (ev.land) landHit = true;
         if (isFinite(ev.hours)) tHours += ev.hours;
