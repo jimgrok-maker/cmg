@@ -135,7 +135,7 @@
     let acc = startHours;
     let guard = 0;
     while (guard++ < 48) {
-      const w = windAtFn ? (windAtFn(acc) || fallback) : fallback;
+      const w = windAtFn ? (windAtFn(acc, cursor) || fallback) : fallback;
       const tws = w.tws != null ? w.tws : fallback.tws;
       const twd = w.twd != null ? w.twd : fallback.twd;
       const ev = evaluateSegment(cursor, b, cls, tws, twd, lakeRing, islands);
