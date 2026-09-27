@@ -196,6 +196,7 @@
   }
   function addWp(pt) {
     state.waypoints.push({ lat: pt.lat, lon: pt.lon, name: pt.name || ("Mark " + (state.waypoints.length + 1)) });
+    state.windField = null;
     drawWaypoints(); renderWpList(); compute();
   }
   function drawWaypoints() {
@@ -211,7 +212,7 @@
       const d = document.createElement("div"); d.className = "wp";
       d.innerHTML = "<span>" + (i+1) + " · " + w.name + "</span>";
       const rm = document.createElement("button"); rm.className = "ghost"; rm.textContent = "remove";
-      rm.onclick = function () { state.waypoints.splice(i, 1); drawWaypoints(); renderWpList(); compute(); };
+      rm.onclick = function () { state.waypoints.splice(i, 1); state.windField = null; drawWaypoints(); renderWpList(); compute(); };
       d.appendChild(rm); box.appendChild(d);
     });
   }
@@ -242,16 +243,29 @@
   }
   function sampleRoutePoints(rt) {
     const pts = [];
-    function add(lat, lon) {
-      if (pts.some(function (p) { return CMGGeo.haversineNm(p, { lat: lat, lon: lon }) < 3; })) return;
-      pts.push({ lat: lat, lon: lon });
-    }
     if (!rt || !rt.segs.length) return pts;
-    add(rt.segs[0].from.lat, rt.segs[0].from.lon);
+    const total = rt.totalNm || rt.segs.reduce(function (n, s) { return n + (s.dist || 0); }, 0);
+    const n = Math.max(2, Math.min(12, Math.round(total / 8) + 1));
+    const step = total / Math.max(1, n - 1);
+    let acc = 0, next = 0;
+    pts.push({ lat: rt.segs[0].from.lat, lon: rt.segs[0].from.lon });
+    next = step;
     rt.segs.forEach(function (s) {
-      add(s.from.lat, s.from.lon);
-      add(s.to.lat, s.to.lon);
+      const d = s.dist || 0;
+      while (next + 1e-6 < acc + d && pts.length < n) {
+        const f = d > 0 ? (next - acc) / d : 1;
+        const ff = Math.max(0, Math.min(1, f));
+        pts.push({
+          lat: s.from.lat + (s.to.lat - s.from.lat) * ff,
+          lon: s.from.lon + (s.to.lon - s.from.lon) * ff
+        });
+        next += step;
+      }
+      acc += d;
     });
+    const last = rt.segs[rt.segs.length - 1].to;
+    const tail = pts[pts.length - 1];
+    if (!tail || CMGGeo.haversineNm(tail, last) > 1) pts.push({ lat: last.lat, lon: last.lon });
     return pts.slice(0, 12);
   }
   async function refineWindField(rt) {
@@ -354,7 +368,8 @@
     if (rt.motorUsed) warn.push("VMG < 2 kn on a leg; motor at 4 kn used in hybrid compare.");
     const rw = document.getElementById("routeWarn");
     rw.innerHTML = warn.join(" "); rw.classList.toggle("hidden", warn.length === 0);
-    if (!skipRefine && !state.windField) refineWindField(rt);
+    const needField = !state.windField || (rt.totalNm > 20 && state.windField.length < 4);
+    if (!skipRefine && needField) refineWindField(rt);
   }
   async function refreshWind() {
     const src = state.windSource;
