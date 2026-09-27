@@ -32,46 +32,78 @@
       <button type="button" id="editSetup">Setup</button>
     </header>
     <section id="setup" class="sheet setup-sheet">
-      <h2 id="setupTitle">Water</h2>
-      <label for="lake">Lake or bay</label>
-      <select id="lake">
-        <option value="erie" selected>Lake Erie</option>
-        <option value="ontario">Lake Ontario</option>
-        <option value="huron">Lake Huron</option>
-        <option value="michigan">Lake Michigan</option>
-        <option value="superior">Lake Superior</option>
-        <option value="chesapeake">Chesapeake Bay</option>
-      </select>
-      <div class="row" style="margin-top:0.45rem">
-        <label>Wind source
-          <select id="windSource">
-            <option value="hrrr">HRRR (default)</option>
-            <option value="gfs">GFS</option>
-            <option value="ecmwf">ECMWF</option>
-            <option value="manual">Manual TWD / TWS</option>
-          </select>
-        </label>
-        <label>Depth chart
-          <select id="depth">
-            <option value="noaa">NOAA ENC / BlueTopo — shoreline only</option>
-            <option value="chs">CHS note — shoreline only</option>
-          </select>
-        </label>
+      <div class="setup-tabs">
+        <button type="button" class="tab on" id="tabSetup">Setup</button>
+        <button type="button" class="tab" id="tabFaq">FAQ</button>
       </div>
-      <div class="row" style="margin-top:0.45rem">
-        <label>Boat
-          <select id="boat"></select>
+      <div id="setupPane">
+        <h2 id="setupTitle">Water</h2>
+        <label for="lake">Lake or bay</label>
+        <select id="lake">
+          <option value="erie" selected>Lake Erie</option>
+          <option value="ontario">Lake Ontario</option>
+          <option value="huron">Lake Huron</option>
+          <option value="michigan">Lake Michigan</option>
+          <option value="superior">Lake Superior</option>
+          <option value="chesapeake">Chesapeake Bay</option>
+        </select>
+        <div class="row" style="margin-top:0.45rem">
+          <label>Wind source
+            <select id="windSource">
+              <option value="hrrr">HRRR (default)</option>
+              <option value="gfs">GFS</option>
+              <option value="ecmwf">ECMWF</option>
+              <option value="manual">Manual TWD / TWS</option>
+            </select>
+          </label>
+          <label>Depth chart
+            <select id="depth">
+              <option value="noaa">NOAA ENC / BlueTopo — shoreline only</option>
+              <option value="chs">CHS note — shoreline only</option>
+            </select>
+          </label>
+        </div>
+        <div class="row" style="margin-top:0.45rem">
+          <label>Boat
+            <select id="boat"></select>
+          </label>
+          <label id="genericWrap" class="hidden">LWL (ft)
+            <input id="genericLwl" type="number" min="12" max="50" step="0.1" />
+          </label>
+        </div>
+        <p id="boatMeta" class="disclaimer"></p>
+        <label style="margin-top:0.4rem;flex-direction:row;align-items:center;gap:0.45rem;text-transform:none">
+          <input type="checkbox" id="mag" /> Magnetic courses (<span id="varLabel">Var 7.6°W</span>)
         </label>
-        <label id="genericWrap" class="hidden">LWL (ft)
-          <input id="genericLwl" type="number" min="12" max="50" step="0.1" />
-        </label>
+        <div class="chip">Check official NOAA / CHS chart for depths. CMG stays inside a coarse shoreline. Planning aid — not a chartplotter. Island routing is detailed on Erie first.</div>
+        <button class="primary" id="openChart" style="width:100%;margin-top:0.4rem">Open chart</button>
       </div>
-      <p id="boatMeta" class="disclaimer"></p>
-      <label style="margin-top:0.4rem;flex-direction:row;align-items:center;gap:0.45rem;text-transform:none">
-        <input type="checkbox" id="mag" /> Magnetic courses (<span id="varLabel">Var 7.6°W</span>)
-      </label>
-      <div class="chip">Check official NOAA / CHS chart for depths. CMG stays inside a coarse shoreline. Planning aid — not a chartplotter. Island routing is detailed on Erie first.</div>
-      <button class="primary" id="openChart" style="width:100%;margin-top:0.4rem">Open chart</button>
+      <div id="faqPane" class="faq hidden">
+        <h3>What is CMG?</h3>
+        <p>A trip planner, not a chartplotter. It estimates course made good from polars + forecast wind and keeps you inside a coarse shoreline. Always check NOAA / CHS for depths.</p>
+        <h3>TWD FROM vs the arrow</h3>
+        <p>Numbers are meteorological FROM (where the wind comes from). Gold barbs point downwind (where it is going). Tap a barb for both.</p>
+        <h3>Where does the wind come from?</h3>
+        <p>Open-Meteo. Default HRRR is the U.S. high-res model (~3 km / 1.6 nm cells, hourly, ~48 h). GFS and ECMWF are coarser backups. Manual is whatever you type.</p>
+        <h3>Does the wind change along a 10-hour sail?</h3>
+        <p>Yes, two ways. Time: each hour of the trip reads that hour of the forecast. Place: after the first rough route, CMG pulls HRRR at about 8–12 points along the track (roughly every hour of sailing) and reruns the polar with the nearest cell. A 10-mile hop barely notices. A 40–50 nm Erie or Bay run can change FROM angle at the far end.</p>
+        <h3>Two-pass routing</h3>
+        <p>Pass 1 uses map-center wind to guess where you will be each hour. Pass 2 fetches those cells and rebuilds speed and ETA. If the second fetch fails, the center forecast stays.</p>
+        <h3>What it will not fix</h3>
+        <p>Model error, gusts, and thunderstorm outflow. Spatial sampling only stops us from using Sandusky’s 14:00 wind when the bow is off Pelee at 18:00.</p>
+        <h3>Polars and speed</h3>
+        <p>Working-sail synthetic polars scaled to hull speed (1.34 × √LWL). MacGregor 26X assumes board down, full ballast. Avg kn in the header is polar CMG for the plan. SOG kn is GPS over ground.</p>
+        <h3>Motor policy</h3>
+        <p>Default is sail only. Hybrid compare motors at 4 kn when VMG is under 2 kn. Goal is 4 kn plus when the angle allows.</p>
+        <h3>Islands</h3>
+        <p>Erie has keep-off hulls for Pelee, Middle Island, Bass, Kelleys. A reaching rhumb that crosses land gets a short wet detour. Other lakes use a coarse shoreline only — add taps around points.</p>
+        <h3>Colors</h3>
+        <p>Green reach, yellow tight, red no-go, blue motor. Gold line is the GPS wake, not the plan.</p>
+        <h3>Units</h3>
+        <p>Nautical miles and knots. Courses true unless Magnetic is checked (local variation west).</p>
+        <h3>P50 / P90</h3>
+        <p>P50 is polar time in the forecast we have. P90 is that time × 1.22 — a fudge for lulls, bad trim, and traffic, not a second weather model.</p>
+      </div>
     </section>
     <div id="planner" class="hidden">
       <div id="mapWrap">
