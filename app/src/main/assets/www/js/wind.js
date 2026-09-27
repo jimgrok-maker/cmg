@@ -1,5 +1,6 @@
 (function (w) {
   const KEY = "cmg.wind.cache";
+  const FIELD_KEY = "cmg.wind.field";
   function modelParam(source) {
     if (source === "hrrr") return "gfs_hrrr";
     if (source === "gfs") return "gfs_seamless";
@@ -59,7 +60,10 @@
         });
       }
     } catch (e) {}
-    if (packs.length >= pts.length) return packs;
+    if (packs.length >= pts.length) {
+      saveField(packs);
+      return packs;
+    }
     const out = packs.slice();
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i];
@@ -69,10 +73,28 @@
       if (already) continue;
       try { out.push(await fetchForecast(p.lat, p.lon, source, tz)); } catch (e) {}
     }
+    if (out.length) saveField(out);
     return out;
+  }
+  function saveField(field) {
+    try {
+      localStorage.setItem(FIELD_KEY, JSON.stringify({ savedAt: Date.now(), field: field || [] }));
+    } catch (e) {}
+  }
+  function loadField() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(FIELD_KEY) || "null");
+      if (raw && Array.isArray(raw.field) && raw.field.length) return raw;
+    } catch (e) {}
+    return null;
   }
   function loadCache() {
     try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+  function ageHours(packOrField) {
+    const t = packOrField && (packOrField.fetchedAt || packOrField.savedAt);
+    if (!t) return null;
+    return (Date.now() - t) / 3600000;
   }
   function atTime(pack, whenMs) {
     if (!pack || !pack.hourly || !pack.hourly.time || !pack.hourly.time.length) return null;
@@ -82,7 +104,7 @@
       const d = Math.abs(Date.parse(times[i]) - whenMs);
       if (d < bestD) { bestD = d; best = i; }
     }
-    return { tws: pack.hourly.tws[best], twd: pack.hourly.twd[best], gust: pack.hourly.gust[best], time: times[best], ageH: bestD / 3600000 };
+    return { tws: pack.hourly.tws[best], twd: pack.hourly.twd[best], gust: pack.hourly.gust[best], code: pack.hourly.code[best], time: times[best], ageH: bestD / 3600000 };
   }
   function nearestPack(field, lat, lon) {
     if (!field || !field.length) return null;
@@ -97,5 +119,5 @@
     const pack = nearestPack(field, lat, lon);
     return pack ? atTime(pack, whenMs) : null;
   }
-  w.CMGWind = { fetchForecast, fetchMany, loadCache, atTime, atPlace, nearestPack };
+  w.CMGWind = { fetchForecast, fetchMany, loadCache, loadField, saveField, ageHours, atTime, atPlace, nearestPack };
 })(window);
