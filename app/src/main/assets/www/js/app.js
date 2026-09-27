@@ -6,6 +6,7 @@
     windPack: null, waypoints: [], lakeRing: null, islands: [], route: null, outline: null
   };
   let map, routeLayer, wpLayer, islandLayer, windLayer, poiLayer;
+  let lastFix = null, boatMark = null, gpsWatch = null;
 
   function lake() {
     if (typeof CMGLakeById === "function") return CMGLakeById(state.lakeId);
@@ -48,6 +49,37 @@
     const t = document.getElementById("hudTtd");
     if (s) s.textContent = spd;
     if (t) t.textContent = ttd;
+  }
+  function setSog(txt) {
+    const el = document.getElementById("hudSog");
+    if (el) el.textContent = txt;
+  }
+  function startGps() {
+    if (!navigator.geolocation) { setSog("n/a"); return; }
+    if (gpsWatch != null) return;
+    setSog("…");
+    gpsWatch = navigator.geolocation.watchPosition(onFix, function () { setSog("off"); }, {
+      enableHighAccuracy: true, maximumAge: 1000, timeout: 20000
+    });
+  }
+  function onFix(pos) {
+    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+    let kn = null;
+    if (pos.coords.speed != null && isFinite(pos.coords.speed) && pos.coords.speed >= 0) {
+      kn = pos.coords.speed * 1.943844;
+    } else if (lastFix) {
+      const hours = (pos.timestamp - lastFix.t) / 3600000;
+      if (hours > 0.00008) kn = CMGGeo.haversineNm({ lat: lastFix.lat, lon: lastFix.lon }, { lat: lat, lon: lon }) / hours;
+    }
+    lastFix = { lat: lat, lon: lon, t: pos.timestamp };
+    setSog(kn == null ? "…" : kn.toFixed(1));
+    if (map) {
+      if (!boatMark) {
+        boatMark = L.circleMarker([lat, lon], { radius: 8, color: "#fff", weight: 2, fillColor: "#3d9a6a", fillOpacity: 1 }).addTo(map).bindTooltip("You");
+      } else {
+        boatMark.setLatLng([lat, lon]);
+      }
+    }
   }
   function showSetup(on) {
     document.getElementById("setup").classList.toggle("hidden", !on);
@@ -306,12 +338,14 @@
         initMap();
         applyLake();
         resizeMap();
+        startGps();
         refreshWind();
       });
     });
   }
   document.addEventListener("DOMContentLoaded", function () {
     loadPrefs(); fillLakes(); renderBoatOptions(); bindSetup();
+    startGps();
     document.getElementById("poi").onchange = function () {
       const p = (window.CMG_POIS || []).find(function (x) { return x.id === document.getElementById("poi").value; });
       if (p) addWp({ lat:p.lat, lon:p.lon, name:p.name });
