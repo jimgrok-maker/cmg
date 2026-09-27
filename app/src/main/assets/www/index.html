@@ -80,29 +80,23 @@
       </div>
       <div id="faqPane" class="faq hidden">
         <h3>What is CMG?</h3>
-        <p>A trip planner, not a chartplotter. It estimates course made good from polars + forecast wind and keeps you inside a coarse shoreline. Always check NOAA / CHS for depths.</p>
+        <p>A trip planner with a live SOG and gold GPS track. Not a chartplotter. Always check NOAA / CHS for depths.</p>
+        <h3>Leave-at</h3>
+        <p>Default is now. Set a later departure and every gold tag and polar hour shifts to that clock. Use it for an overnight so dusk and dawn get the right HRRR hours.</p>
         <h3>TWD FROM vs the arrow</h3>
-        <p>Numbers are meteorological FROM (where the wind comes from). Gold barbs point downwind (where it is going). Tap a barb for both.</p>
+        <p>Numbers are meteorological FROM. Gold barbs point downwind. Gxx on a barb is gust knots at that hour.</p>
         <h3>Where does the wind come from?</h3>
-        <p>Open-Meteo. Default HRRR is the U.S. high-res model (~3 km / 1.6 nm cells, hourly, ~48 h). GFS and ECMWF are coarser backups. Manual is whatever you type.</p>
-        <h3>Does the wind change along a 10-hour sail?</h3>
-        <p>Yes, two ways. Time: each hour of the trip reads that hour of the forecast. Place: after the first rough route, CMG pulls HRRR at about 8–12 points along the track (roughly every hour of sailing) and reruns the polar with the nearest cell. A 10-mile hop barely notices. A 40–50 nm Erie or Bay run can change FROM angle at the far end.</p>
-        <h3>Two-pass routing</h3>
-        <p>Pass 1 uses map-center wind to guess where you will be each hour. Pass 2 fetches those cells and rebuilds speed and ETA. If the second fetch fails, the center forecast stays.</p>
-        <h3>What it will not fix</h3>
-        <p>Model error, gusts, and thunderstorm outflow. Spatial sampling only stops us from using Sandusky’s 14:00 wind when the bow is off Pelee at 18:00.</p>
-        <h3>Polars and speed</h3>
-        <p>Working-sail synthetic polars scaled to hull speed (1.34 × √LWL). MacGregor 26X assumes board down, full ballast. Avg kn in the header is polar CMG for the plan. SOG kn is GPS over ground.</p>
-        <h3>Motor policy</h3>
-        <p>Default is sail only. Hybrid compare motors at 4 kn when VMG is under 2 kn. Goal is 4 kn plus when the angle allows.</p>
-        <h3>Islands</h3>
-        <p>Erie has keep-off hulls for Pelee, Middle Island, Bass, Kelleys. A reaching rhumb that crosses land gets a short wet detour. Other lakes use a coarse shoreline only — add taps around points.</p>
-        <h3>Colors</h3>
-        <p>Green reach, yellow tight, red no-go, blue motor. Gold line is the GPS wake, not the plan.</p>
-        <h3>Units</h3>
-        <p>Nautical miles and knots. Courses true unless Magnetic is checked (local variation west).</p>
+        <p>Open-Meteo HRRR (~3 km cells, hourly, ~48 h). After the first route, CMG samples up to 12 cells along the track (~every 8 nm) and times each cell to when you are predicted to be there.</p>
+        <h3>No cell signal</h3>
+        <p>The last center forecast and the last 12-cell field are saved on the phone. Offline, CMG keeps using them and marks the age. A refresh runs every 60 minutes when a fetch works.</p>
         <h3>P50 / P90</h3>
-        <p>P50 is polar time in the forecast we have. P90 is that time × 1.22 — a fudge for lulls, bad trim, and traffic, not a second weather model.</p>
+        <p>P50 is polar time in the forecast we have. P90 is that time × 1.22 — lulls, slop, and a forecast that was 20° off. Not a second model.</p>
+        <h3>SOG vs polar</h3>
+        <p>After about 20 minutes of GPS motion, CMG compares live SOG to the planned polar average.</p>
+        <h3>Motor policy</h3>
+        <p>Default is sail only. Hybrid compare motors at 4 kn when VMG is under 2 kn.</p>
+        <h3>Islands</h3>
+        <p>Erie has keep-off hulls for Pelee, Middle Island, Bass, Kelleys. Other lakes: coarse shoreline only.</p>
       </div>
     </section>
     <div id="planner" class="hidden">
@@ -122,7 +116,14 @@
           <label>TWD from °<input id="twd" type="number" step="1" min="0" max="360" /></label>
           <label>Listed mark<select id="poi"></select></label>
         </div>
+        <div class="row" style="margin-top:0.35rem">
+          <label>Leave at
+            <input id="depart" type="datetime-local" />
+          </label>
+          <button type="button" class="ghost" id="departNow" style="align-self:end">Use now</button>
+        </div>
         <p id="windLabel" class="disclaimer"></p>
+        <p id="polarDelta" class="disclaimer"></p>
         <label style="flex-direction:row;align-items:center;gap:0.45rem;text-transform:none;margin:0.3rem 0">
           <input type="checkbox" id="hybrid" /> Hybrid compare — motor 4 kn if VMG < 2 kn
         </label>
