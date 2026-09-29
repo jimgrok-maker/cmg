@@ -10,8 +10,8 @@ android {
         applicationId = "com.cmg.erie"
         minSdk = 26
         targetSdk = 34
-        versionCode = 19
-        versionName = "0.2.8"
+        versionCode = 20
+        versionName = "0.2.9"
     }
 
     buildTypes {
