@@ -35,5 +35,16 @@ window.CMG_POIS = [
   { id:"ann", lake:"chesapeake", name:"Annapolis", short:"Annapolis", lat:38.977, lon:-76.480 },
   { id:"bal", lake:"chesapeake", name:"Baltimore Inner Harbor", short:"Baltimore", lat:39.285, lon:-76.609 },
   { id:"nor", lake:"chesapeake", name:"Norfolk / Hampton Roads", short:"Norfolk", lat:36.948, lon:-76.330 },
-  { id:"tan", lake:"chesapeake", name:"Tangier Island", short:"Tangier", lat:37.826, lon:-75.992 }
+  { id:"tan", lake:"chesapeake", name:"Tangier Island", short:"Tangier", lat:37.826, lon:-75.992 },
+  { id:"mos-sp", lake:"mosquito", name:"Mosquito Lake State Park ramp", short:"SP ramp", lat:41.376, lon:-80.755 },
+  { id:"mos-n", lake:"mosquito", name:"Mosquito north ramp", short:"North ramp", lat:41.445, lon:-80.768 },
+  { id:"buc-sp", lake:"buckeye", name:"Buckeye Lake State Park", short:"BL SP", lat:39.924, lon:-82.462 },
+  { id:"buc-w", lake:"buckeye", name:"Buckeye west end", short:"West end", lat:39.923, lon:-82.508 },
+  { id:"alu-sp", lake:"alum", name:"Alum Creek State Park marina", short:"AC marina", lat:40.177, lon:-82.955 },
+  { id:"alu-n", lake:"alum", name:"Alum north ramp", short:"North ramp", lat:40.248, lon:-82.958 },
+  { id:"glm-sp", lake:"grand", name:"Grand Lake St. Marys State Park", short:"GLSM SP", lat:40.548, lon:-84.468 },
+  { id:"glm-w", lake:"grand", name:"Celina west end", short:"Celina", lat:40.549, lon:-84.568 },
+  { id:"ind-sp", lake:"indian", name:"Indian Lake State Park", short:"IL SP", lat:40.468, lon:-83.865 },
+  { id:"ind-w", lake:"indian", name:"Indian Lake west", short:"West", lat:40.480, lon:-83.918 },
+  { id:"gui-sp", lake:"guilford", name:"Guilford Lake State Park ramp", short:"GL ramp", lat:40.796, lon:-80.862 }
 ];
