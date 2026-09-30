@@ -145,7 +145,7 @@
       if (!isFinite(ev.hours) || ev.hours <= 1.05 || ev.dist < 0.12) {
         ev.startH = acc;
         out.push(ev);
-        acc += isFinite(ev.hours) ? ev.hours : 0;
+        acc = isFinite(ev.hours) ? acc + ev.hours : Infinity;
         break;
       }
       const frac = 1 / ev.hours;
@@ -156,7 +156,7 @@
       }
       piece.startH = acc;
       out.push(piece);
-      acc += isFinite(piece.hours) ? piece.hours : 1;
+      acc += isFinite(piece.hours) ? piece.hours : Infinity;
       cursor = mid;
     }
     return { segs: out, endHours: acc };
@@ -180,21 +180,25 @@
       expanded.push(b);
     }
     const segs = [];
-    let tHours = 0, sailNm = 0, motorNm = 0, motorUsed = false, landHit = false, vmg2 = 0, vmg4 = 0, totalNm = 0;
+    let tHours = 0, sailNm = 0, motorNm = 0, motorUsed = false, landHit = false, nogoHit = false, vmg2 = 0, vmg4 = 0, totalNm = 0;
     for (let i = 0; i < expanded.length - 1; i++) {
-      const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback);
+      const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, isFinite(tHours) ? tHours : 0, windAtFn, fallback);
       part.segs.forEach(function (ev) {
         if (ev.mode === "motor") { motorUsed = true; motorNm += ev.dist; } else sailNm += ev.dist;
+        if (ev.mode === "nogo") nogoHit = true;
         if (ev.land) landHit = true;
-        if (isFinite(ev.hours)) tHours += ev.hours;
+        if (isFinite(ev.hours) && isFinite(tHours)) tHours += ev.hours;
+        else if (!isFinite(ev.hours)) tHours = Infinity;
         totalNm += ev.dist;
         if (ev.toward >= 2) vmg2 += ev.dist;
         if (ev.toward >= 4) vmg4 += ev.dist;
         segs.push(ev);
       });
-      tHours = part.endHours;
+      if (isFinite(part.endHours) && isFinite(tHours)) tHours = part.endHours;
+      else if (!isFinite(part.endHours)) tHours = Infinity;
     }
-    return { points: expanded, segs, tHours, totalNm, sailNm, motorNm, motorUsed, landHit, pctVmg2: totalNm ? 100*vmg2/totalNm : 0, pctVmg4: totalNm ? 100*vmg4/totalNm : 0 };
+    if (nogoHit && !hybrid) tHours = Infinity;
+    return { points: expanded, segs, tHours, totalNm, sailNm, motorNm, motorUsed, landHit, nogoHit, pctVmg2: totalNm ? 100*vmg2/totalNm : 0, pctVmg4: totalNm ? 100*vmg4/totalNm : 0 };
   }
   w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, MOTOR_KN, NOGO };
 })(window);
