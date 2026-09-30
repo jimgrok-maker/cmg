@@ -96,11 +96,15 @@
         <h3>No cell signal</h3>
         <p>The last center forecast and the last 12-cell field are saved on the phone. Offline, CMG keeps using them and marks the age. A refresh runs every 60 minutes when a fetch works.</p>
         <h3>P50 / P90</h3>
-        <p>P50 is polar time in the forecast we have. P90 is that time × 1.22 — lulls, slop, and a forecast that was 20° off. Not a second model.</p>
+        <p>P50 is polar time in the forecast we have. P90 is that time × 1.22 — lulls, slop, and a forecast that was 20° off. Not a second model. A sail-only no-go leg blanks P50 instead of showing 0h 00m.</p>
         <h3>SOG vs polar</h3>
         <p>After about 20 minutes of GPS motion, CMG compares live SOG to the planned polar average.</p>
         <h3>Motor policy</h3>
         <p>Default is sail only. Hybrid compare motors at 4 kn when VMG is under 2 kn.</p>
+        <h3>Fence vs chart</h3>
+        <p>The thin line around a lake and dashed island hulls are a wet/dry test, not the shoreline. OSM under the map is the shore. GPS track ignores the fence.</p>
+        <h3>GPX</h3>
+        <p>Export GPX shares the planned route (marks plus any auto detour) to Files or OpenCPN. Planning stays in CMG; the last mile stays on a real chart.</p>
         <h3>Islands</h3>
         <p>Erie has keep-off hulls for Pelee, Middle Island, Bass, Kelleys. Ohio inland lakes use a coarse reservoir outline only — add taps around coves.</p>
       </div>
@@ -136,11 +140,12 @@
         <div class="stats" id="stats"></div>
         <p id="routeWarn" class="chip hidden"></p>
         <div id="wps"></div>
-        <div style="display:flex;gap:0.4rem;margin-top:0.35rem">
+        <div style="display:flex;gap:0.4rem;margin-top:0.35rem;flex-wrap:wrap">
           <button class="ghost" id="clearWp">Clear marks</button>
           <button class="ghost" id="clearTrack">Clear track</button>
+          <button class="ghost" id="exportGpx">Export GPX</button>
         </div>
-        <p class="disclaimer">Gold line is your GPS track. Planned route stays color-coded by TWA.</p>
+        <p class="disclaimer">Gold line is your GPS track. Planned route stays color-coded by TWA. Export GPX for the plotter.</p>
       </section>
     </div>
   </div>
