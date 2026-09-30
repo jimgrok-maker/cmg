@@ -1,25 +1,95 @@
 # CMG — Course Made Good
 
-Lake Erie sailing planner. **Android APK**, not a website.
+Android sailing **trip planner** with a live SOG and gold GPS track. Not a website. Not a chartplotter.
 
-Planning aid only. Not a chartplotter. Stay inside the shoreline and check official NOAA / CHS depths.
+Tap marks on an OSM map, get a polar-based course-made-good estimate from forecast wind, and see whether that rhumb stays inside a coarse shoreline. Always check official NOAA / CHS depths before you go.
 
-## Install the APK
+**Current build:** `0.2.9` (`versionCode` 20) · package `com.cmg.erie` · debug-signed.
 
-1. Open **Actions** on this repo, open the latest **Build APK** run.
-2. Download the artifact **cmg-apk** (`cmg-0.1.0-debug.apk`).
-3. On the phone allow install from this source, then tap the APK.
+## Install
 
-Debug-signed. Fine for your boat; not Play Store.
+1. Repo → **Actions** → latest green **Build APK** run.
+2. Download the artifact **cmg-apk**. The file inside is still named `cmg-0.1.0-debug.apk` (Actions rename has not been bumped; the app itself reports 0.2.9).
+3. On the phone, allow install from this source and tap the APK.
 
-Re-run anytime: Actions → Build APK → Run workflow.
+Push to `main` or **Actions → Build APK → Run workflow** to rebuild.
 
-## App
+## What it does now
 
-- Full Lake Erie OSM map, western-basin + Pelee + Middle Island
-- Wind: HRRR / GFS / ECMWF / manual
-- Boats: MacGregor 26X (board down, ballast full), Catalina 22, Catalina 30, Hunter 34, S2 8.0, generic hull speed 1.34√LWL
-- Sail-only default; hybrid motors at 4 kn if VMG < 2 kn
-- nm / kn
+### Waters
 
-Package: `com.cmg.erie`
+Setup picker:
+
+- Great Lakes: Erie, Ontario, Huron, Michigan, Superior
+- Chesapeake Bay
+- Ohio inland: Mosquito Creek, Buckeye, Alum Creek, Grand Lake St. Marys, Indian, Guilford
+
+Each water has a **coarse ring** used only as a wet/dry fence for *planned* rhumbs. OSM under the map is the real shore. GPS track ignores the ring.
+
+Western Lake Erie also has keep-off hulls for Pelee, Middle Island, South / Middle / North Bass, Kelleys, Green, Rattlesnake. Those hulls are padded polygons so a straight line does not cut an island. They are not the island shoreline.
+
+Listed ramps / harbors exist per water (Erie islands in more detail).
+
+### Wind
+
+- Sources: Open-Meteo **HRRR** (default), GFS, ECMWF, or manual TWD / TWS
+- TWD is meteorological **FROM**. Gold barbs point **downwind**. `Gxx` on a barb is gust knots at that hour.
+- Two-pass field on a route: guess with map-center wind, then sample up to **12 HRRR cells** along the track (~every 8 nm) and time each cell to when you are predicted to be there.
+- **Leave-at** clock (default now). Shift departure and every barb / polar hour moves with it. First barb says `dep` if leave-at is not “now.”
+- Center forecast and the 12-cell field are cached on the phone. Offline uses the last pack and labels it stale. Refresh every **60 minutes** when a fetch works.
+
+### Boats and routing
+
+Working-sail synthetic polars scaled to hull speed `1.34 × √LWL`:
+
+- MacGregor 26X (board down, full ballast)
+- Catalina 22, Catalina 30, Hunter 34, S2 8.0
+- Generic LWL formula
+
+Default is **sail only**. Hybrid compare motors at 4 kn when VMG < 2 kn. Goal band is 4 kn+ when the angle allows.
+
+No-go inside ~40° TWA (red). Tight yellow, reach green, motor blue.
+
+P50 is polar time in the forecast we have. P90 is that time × 1.22 (lulls / slop / a forecast that was 20° off — not a second model).
+
+Units: nautical miles and knots. Courses true unless Magnetic is checked (local variation west).
+
+### On the water
+
+- HUD: live **SOG kn** (GPS), planned **avg kn**, **to dest**
+- Gold polyline is the GPS wake, not the plan
+- After ~20 min underway, **SOG vs polar** (`+/− kn`)
+- Tap anywhere or pick a listed mark; two marks minimum for a plan
+
+## What it does not do
+
+- Official depths, buoys, or ENC
+- Currents, seiche, or lake breeze smaller than ~8 nm
+- Racing router with many tacks (one upwind tack attempt only)
+- Offset-rhumb compare (Pelee north vs south) — parked
+- GPX export — parked
+- Daylight / sunset gate — parked
+
+Rings that look “wrong” on inland lakes or around Long Point / Point Pelee are the fence, not the chart. A wet rhumb that clips the fence draws dashed red and asks for another waypoint.
+
+## Layout
+
+Android WebView wrapping `app/src/main/assets/www`:
+
+```
+www/
+  index.html          Setup + planner shell + FAQ
+  css/app.css
+  data/lakes.js       Waters, centers, coarse rings
+  data/islands.js     Erie keep-off hulls
+  js/pois.js          Listed marks
+  js/geo.js           Distance, bearings, point-in-ring
+  js/polars.js        Classes + hull speed
+  js/wind.js          Open-Meteo + field cache
+  js/route.js         Polar CMG + island detour + no-go
+  js/app.js           Map, HUD, GPS, leave-at
+```
+
+## FAQ in the app
+
+Setup → **FAQ** covers TWD FROM vs the barb, two-pass wind, leave-at, cache, P50/P90, motor policy, and island limits.
