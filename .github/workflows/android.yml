@@ -29,10 +29,11 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/cmg-0.1.0-debug.apk
+          VER=$(grep -oE 'versionName = "[^"]+"' app/build.gradle.kts | head -1 | cut -d'"' -f2)
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/cmg-${VER}-debug.apk"
           ls -la dist app/build/outputs/apk/debug || true
 
       - uses: actions/upload-artifact@v4
         with:
           name: cmg-apk
-          path: dist/cmg-0.1.0-debug.apk
+          path: dist/cmg-*-debug.apk

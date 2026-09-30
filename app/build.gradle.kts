@@ -10,8 +10,8 @@ android {
         applicationId = "com.cmg.erie"
         minSdk = 26
         targetSdk = 34
-        versionCode = 20
-        versionName = "0.2.9"
+        versionCode = 21
+        versionName = "0.3.0"
     }
 
     buildTypes {
@@ -27,4 +27,5 @@ android {
 
 dependencies {
     implementation("androidx.webkit:webkit:1.11.0")
+    implementation("androidx.core:core:1.13.1")
 }

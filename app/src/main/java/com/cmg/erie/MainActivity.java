@@ -3,22 +3,51 @@ package com.cmg.erie;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
+import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewClientCompat;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends Activity {
     private WebView webView;
 
-    @SuppressLint("SetJavaScriptEnabled")
+    public class CmBridge {
+        @JavascriptInterface
+        public void shareGpx(String filename, String text) {
+            try {
+                String safe = filename == null ? "cmg-route.gpx" : filename.replaceAll("[^A-Za-z0-9._-]", "_");
+                File f = new File(getCacheDir(), safe);
+                FileOutputStream out = new FileOutputStream(f);
+                out.write(text.getBytes(StandardCharsets.UTF_8));
+                out.close();
+                Uri uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".files", f);
+                Intent send = new Intent(Intent.ACTION_SEND);
+                send.setType("application/gpx+xml");
+                send.putExtra(Intent.EXTRA_STREAM, uri);
+                send.putExtra(Intent.EXTRA_SUBJECT, safe);
+                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(send, "Share CMG GPX"));
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -55,6 +84,7 @@ public class MainActivity extends Activity {
         s.setGeolocationEnabled(true);
         s.setAllowFileAccess(false);
 
+        webView.addJavascriptInterface(new CmBridge(), "CMGNative");
         webView.loadUrl("https://appassets.androidplatform.net/assets/www/index.html");
     }
 
