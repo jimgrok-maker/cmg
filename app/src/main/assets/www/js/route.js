@@ -124,15 +124,15 @@
     let mode = "sail";
     if (Math.abs(twa) < NOGO) { bsp = 0; mode = "nogo"; }
     const toward = bsp;
-    const hours = bsp > 0.15 ? dist / bsp : Infinity;
-    const motorOffered = toward < 2 || !isFinite(hours);
+    const hours = bsp > 0.15 ? dist / bsp : (mode === "nogo" ? 0 : Infinity);
+    const motorOffered = toward < 2 || mode === "nogo";
     const land = !segmentWet(a, b, lakeRing, islands);
     return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, color: colorForTwa(twa), twd: twd, tws: tws };
   }
   function splitByHour(a, b, cls, lakeRing, islands, hybrid, startHours, windAtFn, fallback) {
     const out = [];
     let cursor = a;
-    let acc = startHours;
+    let acc = isFinite(startHours) ? startHours : 0;
     let guard = 0;
     while (guard++ < 48) {
       const w = windAtFn ? (windAtFn(acc, cursor) || fallback) : fallback;
@@ -142,10 +142,10 @@
       if (hybrid && ev.motorOffered) {
         ev.mode = "motor"; ev.bsp = MOTOR_KN; ev.hours = ev.dist / MOTOR_KN; ev.color = "#6b8ea8"; ev.toward = MOTOR_KN;
       }
-      if (!isFinite(ev.hours) || ev.hours <= 1.05 || ev.dist < 0.12) {
+      if (!isFinite(ev.hours) || ev.hours <= 1.05 || ev.dist < 0.12 || ev.mode === "nogo") {
         ev.startH = acc;
         out.push(ev);
-        acc = isFinite(ev.hours) ? acc + ev.hours : Infinity;
+        acc += (isFinite(ev.hours) && ev.hours > 0) ? ev.hours : 0;
         break;
       }
       const frac = 1 / ev.hours;
@@ -156,7 +156,7 @@
       }
       piece.startH = acc;
       out.push(piece);
-      acc += isFinite(piece.hours) ? piece.hours : Infinity;
+      acc += (isFinite(piece.hours) && piece.hours > 0) ? piece.hours : 0;
       cursor = mid;
     }
     return { segs: out, endHours: acc };
@@ -180,25 +180,24 @@
       expanded.push(b);
     }
     const segs = [];
-    let tHours = 0, sailNm = 0, motorNm = 0, motorUsed = false, landHit = false, nogoHit = false, vmg2 = 0, vmg4 = 0, totalNm = 0;
+    let tHours = 0, sailNm = 0, motorNm = 0, nogoNm = 0, motorUsed = false, landHit = false, nogoHit = false, vmg2 = 0, vmg4 = 0, totalNm = 0;
     for (let i = 0; i < expanded.length - 1; i++) {
-      const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, isFinite(tHours) ? tHours : 0, windAtFn, fallback);
+      const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback);
       part.segs.forEach(function (ev) {
-        if (ev.mode === "motor") { motorUsed = true; motorNm += ev.dist; } else sailNm += ev.dist;
-        if (ev.mode === "nogo") nogoHit = true;
+        if (ev.mode === "motor") { motorUsed = true; motorNm += ev.dist; }
+        else if (ev.mode === "nogo") { nogoHit = true; nogoNm += ev.dist; }
+        else sailNm += ev.dist;
         if (ev.land) landHit = true;
-        if (isFinite(ev.hours) && isFinite(tHours)) tHours += ev.hours;
-        else if (!isFinite(ev.hours)) tHours = Infinity;
+        if (isFinite(ev.hours) && ev.hours > 0) tHours += ev.hours;
         totalNm += ev.dist;
         if (ev.toward >= 2) vmg2 += ev.dist;
         if (ev.toward >= 4) vmg4 += ev.dist;
         segs.push(ev);
       });
-      if (isFinite(part.endHours) && isFinite(tHours)) tHours = part.endHours;
-      else if (!isFinite(part.endHours)) tHours = Infinity;
+      if (isFinite(part.endHours)) tHours = Math.max(tHours, part.endHours);
     }
-    if (nogoHit && !hybrid) tHours = Infinity;
-    return { points: expanded, segs, tHours, totalNm, sailNm, motorNm, motorUsed, landHit, nogoHit, pctVmg2: totalNm ? 100*vmg2/totalNm : 0, pctVmg4: totalNm ? 100*vmg4/totalNm : 0 };
+    if (tHours <= 0 && nogoHit && nogoNm >= totalNm * 0.5) tHours = Infinity;
+    return { points: expanded, segs, tHours, totalNm, sailNm, motorNm, nogoNm, motorUsed, landHit, nogoHit, pctVmg2: totalNm ? 100*vmg2/totalNm : 0, pctVmg4: totalNm ? 100*vmg4/totalNm : 0 };
   }
   w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, MOTOR_KN, NOGO };
 })(window);
