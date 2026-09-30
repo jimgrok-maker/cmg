@@ -17,6 +17,10 @@
       return orig.call(this, latlngs, options);
     };
     L.polygon.__cmgHair = true;
+    if (L.Map && !L.Map.__cmgHook) {
+      L.Map.addInitHook(function () { window.CMGMap = this; });
+      L.Map.__cmgHook = true;
+    }
   }
   patchLeaflet();
   document.addEventListener("DOMContentLoaded", patchLeaflet);

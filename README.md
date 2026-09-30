@@ -4,12 +4,12 @@ Android sailing **trip planner** with a live SOG and gold GPS track. Not a websi
 
 Tap marks on an OSM map, get a polar-based course-made-good estimate from forecast wind, and see whether that rhumb stays inside a coarse shoreline. Always check official NOAA / CHS depths before you go.
 
-**Current build:** `0.2.9` (`versionCode` 20) · package `com.cmg.erie` · debug-signed.
+**Current build:** `0.3.0` (`versionCode` 21) · package `com.cmg.erie` · debug-signed.
 
 ## Install
 
 1. Repo → **Actions** → latest green **Build APK** run.
-2. Download the artifact **cmg-apk**. The file inside is still named `cmg-0.1.0-debug.apk` (Actions rename has not been bumped; the app itself reports 0.2.9).
+2. Download the artifact **cmg-apk**. The file inside is `cmg-0.3.0-debug.apk`.
 3. On the phone, allow install from this source and tap the APK.
 
 Push to `main` or **Actions → Build APK → Run workflow** to rebuild.
@@ -24,9 +24,9 @@ Setup picker:
 - Chesapeake Bay
 - Ohio inland: Mosquito Creek, Buckeye, Alum Creek, Grand Lake St. Marys, Indian, Guilford
 
-Each water has a **coarse ring** used only as a wet/dry fence for *planned* rhumbs. OSM under the map is the real shore. GPS track ignores the ring.
+Each water has a **hairline fence** (no fill) used only as a wet/dry test for *planned* rhumbs. OSM under the map is the real shore. GPS track ignores the fence.
 
-Western Lake Erie also has keep-off hulls for Pelee, Middle Island, South / Middle / North Bass, Kelleys, Green, Rattlesnake. Those hulls are padded polygons so a straight line does not cut an island. They are not the island shoreline.
+Western Lake Erie also has dashed keep-off hulls for Pelee, Middle Island, South / Middle / North Bass, Kelleys, Green, Rattlesnake. Those hulls are padded so a straight line does not cut an island. They are not the island shoreline.
 
 Listed ramps / harbors exist per water (Erie islands in more detail).
 
@@ -46,9 +46,9 @@ Working-sail synthetic polars scaled to hull speed `1.34 × √LWL`:
 - Catalina 22, Catalina 30, Hunter 34, S2 8.0
 - Generic LWL formula
 
-Default is **sail only**. Hybrid compare motors at 4 kn when VMG < 2 kn. Goal band is 4 kn+ when the angle allows.
+Default is **sail only**. Hybrid compare motors at 4 kn when VMG &lt; 2 kn. Goal band is 4 kn+ when the angle allows.
 
-No-go inside ~40° TWA (red). Tight yellow, reach green, motor blue.
+No-go inside ~40° TWA (red). Tight yellow, reach green, motor blue. A sail-only no-go blanks P50 / P90 (`—`) instead of showing `0h 00m`.
 
 P50 is polar time in the forecast we have. P90 is that time × 1.22 (lulls / slop / a forecast that was 20° off — not a second model).
 
@@ -60,6 +60,7 @@ Units: nautical miles and knots. Courses true unless Magnetic is checked (local 
 - Gold polyline is the GPS wake, not the plan
 - After ~20 min underway, **SOG vs polar** (`+/− kn`)
 - Tap anywhere or pick a listed mark; two marks minimum for a plan
+- **Export GPX** shares the planned route to Files / OpenCPN
 
 ## What it does not do
 
@@ -67,10 +68,9 @@ Units: nautical miles and knots. Courses true unless Magnetic is checked (local 
 - Currents, seiche, or lake breeze smaller than ~8 nm
 - Racing router with many tacks (one upwind tack attempt only)
 - Offset-rhumb compare (Pelee north vs south) — parked
-- GPX export — parked
 - Daylight / sunset gate — parked
 
-Rings that look “wrong” on inland lakes or around Long Point / Point Pelee are the fence, not the chart. A wet rhumb that clips the fence draws dashed red and asks for another waypoint.
+A wet rhumb that clips the fence draws dashed red and asks for another waypoint.
 
 ## Layout
 
@@ -87,9 +87,11 @@ www/
   js/polars.js        Classes + hull speed
   js/wind.js          Open-Meteo + field cache
   js/route.js         Polar CMG + island detour + no-go
+  js/fence.js         Hairline lake / island overlay
+  js/gpx-bind.js      GPX share
   js/app.js           Map, HUD, GPS, leave-at
 ```
 
 ## FAQ in the app
 
-Setup → **FAQ** covers TWD FROM vs the barb, two-pass wind, leave-at, cache, P50/P90, motor policy, and island limits.
+Setup → **FAQ** covers TWD FROM vs the barb, two-pass wind, leave-at, cache, P50/P90, motor policy, fence vs chart, GPX, and island limits.
