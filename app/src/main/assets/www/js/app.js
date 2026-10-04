@@ -419,13 +419,14 @@
     try {
       const pack = await CMGWind.fetchForecast(map.getCenter().lat, map.getCenter().lng, src, lake().tz);
       state.windPack = pack;
-      const now = CMGWind.atTime(pack, Date.now());
-      if (now && now.tws != null) {
-        state.tws = now.tws; state.twd = now.twd;
+      const sample = CMGWind.atTime(pack, clockMs());
+      if (sample && sample.tws != null) {
+        state.tws = sample.tws; state.twd = sample.twd;
         document.getElementById("tws").value = Math.round(state.tws * 10) / 10;
         document.getElementById("twd").value = Math.round(state.twd);
-        el.textContent = src.toUpperCase() + " " + now.tws.toFixed(0) + " kn FROM " +
-          String(Math.round(now.twd)).padStart(3,"0") + "\u00b0 @ " + (now.time || "").slice(11,16);
+        const leave = Math.abs(clockMs() - Date.now()) < 120000 ? "now" : "at leave";
+        el.textContent = src.toUpperCase() + " " + sample.tws.toFixed(0) + " kn FROM " +
+          String(Math.round(sample.twd)).padStart(3,"0") + "\u00b0 " + leave + " @ " + (sample.time || "").slice(11,16);
       }
     } catch (e) {
       const cached = CMGWind.loadCache();

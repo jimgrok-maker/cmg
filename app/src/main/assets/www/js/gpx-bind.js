@@ -41,7 +41,8 @@
     if (!xml) { alert("Add two marks first."); return; }
     const fn = "cmg-route.gpx";
     if (window.CMGNative && window.CMGNative.shareGpx) {
-      window.CMGNative.shareGpx(fn, xml);
+      const res = window.CMGNative.shareGpx(fn, xml);
+      if (res && res !== "ok") alert("GPX share failed: " + res);
       return;
     }
     const blob = new Blob([xml], { type: "application/gpx+xml" });

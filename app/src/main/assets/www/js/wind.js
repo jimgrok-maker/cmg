@@ -33,7 +33,7 @@
     url.searchParams.set("wind_speed_unit", "kn");
     url.searchParams.set("timezone", tz || "America/New_York");
     url.searchParams.set("forecast_hours", "48");
-    if (source === "hrrr" || source === "gfs") url.searchParams.set("models", modelParam(source));
+    url.searchParams.set("models", modelParam(source));
     return url.toString();
   }
   async function fetchForecast(lat, lon, source, tz) {
@@ -96,12 +96,34 @@
     if (!t) return null;
     return (Date.now() - t) / 3600000;
   }
+  function tzOffsetMs(utcMs, tz) {
+    try {
+      const fmt = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz || "America/New_York", hourCycle: "h23",
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit"
+      });
+      const parts = fmt.formatToParts(new Date(utcMs));
+      const get = function (k) { return Number(parts.find(function (p) { return p.type === k; }).value); };
+      const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+      return asUtc - utcMs;
+    } catch (e) { return 0; }
+  }
+  function parsePackTime(iso, tz) {
+    const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return Date.parse(iso);
+    const utcGuess = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    let utc = utcGuess - tzOffsetMs(utcGuess, tz);
+    utc = utcGuess - tzOffsetMs(utc, tz);
+    return utc;
+  }
   function atTime(pack, whenMs) {
     if (!pack || !pack.hourly || !pack.hourly.time || !pack.hourly.time.length) return null;
     const times = pack.hourly.time;
+    const tz = pack.tz || "America/New_York";
     let best = 0, bestD = 1e18;
     for (let i = 0; i < times.length; i++) {
-      const d = Math.abs(Date.parse(times[i]) - whenMs);
+      const d = Math.abs(parsePackTime(times[i], tz) - whenMs);
       if (d < bestD) { bestD = d; best = i; }
     }
     return { tws: pack.hourly.tws[best], twd: pack.hourly.twd[best], gust: pack.hourly.gust[best], code: pack.hourly.code[best], time: times[best], ageH: bestD / 3600000 };

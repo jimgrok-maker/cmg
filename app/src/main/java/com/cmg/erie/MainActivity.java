@@ -28,8 +28,9 @@ public class MainActivity extends Activity {
 
     public class CmBridge {
         @JavascriptInterface
-        public void shareGpx(String filename, String text) {
+        public String shareGpx(String filename, String text) {
             try {
+                if (text == null || text.isEmpty()) return "empty route";
                 String safe = filename == null ? "cmg-route.gpx" : filename.replaceAll("[^A-Za-z0-9._-]", "_");
                 File f = new File(getCacheDir(), safe);
                 FileOutputStream out = new FileOutputStream(f);
@@ -42,7 +43,9 @@ public class MainActivity extends Activity {
                 send.putExtra(Intent.EXTRA_SUBJECT, safe);
                 send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 startActivity(Intent.createChooser(send, "Share CMG GPX"));
-            } catch (Exception ignored) {
+                return "ok";
+            } catch (Exception e) {
+                return e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage());
             }
         }
     }
@@ -74,7 +77,7 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
-                callback.invoke(origin, true, false);
+                callback.invoke(origin, locationGranted(), false);
             }
         });
 
@@ -86,6 +89,19 @@ public class MainActivity extends Activity {
 
         webView.addJavascriptInterface(new CmBridge(), "CMGNative");
         webView.loadUrl("https://appassets.androidplatform.net/assets/www/index.html");
+    }
+
+    private boolean locationGranted() {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 42 && locationGranted() && webView != null) {
+            webView.reload();
+        }
     }
 
     @Override
