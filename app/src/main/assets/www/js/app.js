@@ -190,6 +190,7 @@
     const Ldef = lake();
     state.lakeRing = Ldef.ring || null;
     state.islands = islandsHere();
+    if (CMGGeo.setDocks) CMGGeo.setDocks(poisHere());
     if (state.outline) map.removeLayer(state.outline);
     if (Ldef.ring && Ldef.ring.length) {
       state.outline = L.polygon(Ldef.ring.map(function (c) { return [c[1], c[0]]; }), { color:"#2e6a78", weight:1, fill:false }).addTo(map);
@@ -361,10 +362,24 @@
     marks.sort(function (a, b) { return a.h - b.h; });
     marks.forEach(function (m) { placeWindArrow(m.lat, m.lon, m.h, windAtHours(m.h, m)); });
   }
+  function publishRoute(rt) {
+    window.CMGGetRoute = function () {
+      if (!rt || !rt.points || rt.points.length < 2) return null;
+      const points = rt.points.map(function (p) {
+        if (p.name) return { lat: p.lat, lon: p.lon, name: p.name };
+        const hit = state.waypoints.find(function (w) {
+          return Math.abs(w.lat - p.lat) < 1e-5 && Math.abs(w.lon - p.lon) < 1e-5;
+        });
+        return { lat: p.lat, lon: p.lon, name: hit ? hit.name : "" };
+      });
+      return { points: points, wps: state.waypoints.slice() };
+    };
+  }
   function compute(skipRefine) {
     const out = document.getElementById("stats");
     if (!map || state.waypoints.length < 2) {
       state.route = null;
+      window.CMGGetRoute = function () { return null; };
       if (routeLayer) routeLayer.clearLayers();
       if (windLayer) windLayer.clearLayers();
       out.innerHTML = "";
@@ -372,7 +387,7 @@
       return;
     }
     const rt = CMGRoute.buildRoute(state.waypoints, boat(), state.tws, state.twd, state.lakeRing, state.islands, state.hybrid, windAtHours);
-    state.route = rt; drawRoute(rt); drawWindArrows(rt);
+    state.route = rt; publishRoute(rt); drawRoute(rt); drawWindArrows(rt);
     const avg = (isFinite(rt.tHours) && rt.tHours > 0) ? (rt.totalNm / rt.tHours) : 0;
     setHud(avg ? avg.toFixed(1) : "\u2014", fmtHrs(rt.tHours));
     out.innerHTML =
@@ -384,6 +399,7 @@
       '<div class="stat"><b>' + (rt.motorUsed ? "yes" : "no") + '</b><span>motor offered</span></div>';
     const warn = [];
     if (rt.landHit) warn.push("A leg crosses land or an island \u2014 add a waypoint.");
+    if (rt.nogoHit && !state.hybrid) warn.push("Sail-only no-go on a leg \u2014 P50 blanked. Add a tack or turn on hybrid.");
     if (rt.motorUsed) warn.push("VMG < 2 kn on a leg; motor at 4 kn used in hybrid compare.");
     const rw = document.getElementById("routeWarn");
     rw.innerHTML = warn.join(" "); rw.classList.toggle("hidden", warn.length === 0);

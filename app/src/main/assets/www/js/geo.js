@@ -44,13 +44,34 @@
     }
     return inside;
   }
-  function onWater(pt, lakeRing, islands) {
-    if (lakeRing && !pointInRing(pt.lon, pt.lat, lakeRing)) return false;
-    if (islands) {
-      for (const isl of islands) {
-        if (pointInRing(pt.lon, pt.lat, isl.ring)) return false;
-      }
+  const DOCK_NM = 0.35;
+  const DOCK_EXIT_NM = 2.4;
+  let docks = [];
+  function setDocks(list) {
+    docks = (list || []).map(function (d) { return { lat: d.lat, lon: d.lon, name: d.name }; });
+  }
+  function isDock(pt) {
+    if (!pt) return false;
+    for (let i = 0; i < docks.length; i++) {
+      if (haversineNm(pt, docks[i]) <= DOCK_NM) return true;
     }
+    return false;
+  }
+  function islandAt(pt, islands) {
+    if (!pt || !islands) return null;
+    for (let i = 0; i < islands.length; i++) {
+      if (pointInRing(pt.lon, pt.lat, islands[i].ring)) return islands[i];
+    }
+    return null;
+  }
+  function inLake(pt, lakeRing) {
+    if (!lakeRing || !lakeRing.length) return true;
+    return pointInRing(pt.lon, pt.lat, lakeRing);
+  }
+  function onWater(pt, lakeRing, islands) {
+    if (!inLake(pt, lakeRing)) return false;
+    if (isDock(pt)) return true;
+    if (islandAt(pt, islands)) return false;
     return true;
   }
   function samplesOnSegment(a, b, n) {
@@ -61,5 +82,32 @@
     }
     return out;
   }
-  w.CMGGeo = { toRad, toDeg, haversineNm, initialBearing, destPoint, angleDiff, wrap360, pointInRing, onWater, samplesOnSegment };
+  // Listed docks sit inside padded keep-off hulls. Allow a short exit or
+  // arrival through that hull. A line that stays in the hull longer than
+  // DOCK_EXIT_NM is still a crossing.
+  function segmentWet(a, b, lakeRing, islands) {
+    if (!a || !b || !inLake(a, lakeRing) || !inLake(b, lakeRing)) return false;
+    const startDock = isDock(a);
+    const endDock = isDock(b);
+    const startIsl = startDock ? islandAt(a, islands) : null;
+    const endIsl = endDock ? islandAt(b, islands) : null;
+    if (!startDock && !onWater(a, lakeRing, islands)) return false;
+    if (!endDock && !onWater(b, lakeRing, islands)) return false;
+    const dist = haversineNm(a, b);
+    const samples = samplesOnSegment(a, b, Math.max(8, Math.ceil(dist * 14)));
+    let leftStart = !startIsl;
+    for (let i = 0; i < samples.length; i++) {
+      const s = samples[i];
+      if (!inLake(s, lakeRing)) return false;
+      const isl = islandAt(s, islands);
+      if (!isl) { leftStart = true; continue; }
+      const along = haversineNm(a, s);
+      const toEnd = haversineNm(s, b);
+      if (startIsl && isl.id === startIsl.id && !leftStart && along <= DOCK_EXIT_NM) continue;
+      if (endIsl && isl.id === endIsl.id && toEnd <= DOCK_EXIT_NM) continue;
+      return false;
+    }
+    return true;
+  }
+  w.CMGGeo = { toRad, toDeg, haversineNm, initialBearing, destPoint, angleDiff, wrap360, pointInRing, onWater, samplesOnSegment, setDocks, isDock, islandAt, segmentWet, DOCK_NM, DOCK_EXIT_NM };
 })(window);

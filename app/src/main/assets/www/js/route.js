@@ -16,13 +16,7 @@
     return "#8a6b3a";
   }
   function segmentWet(a, b, lakeRing, islands) {
-    if (!CMGGeo.onWater(a, lakeRing, islands) || !CMGGeo.onWater(b, lakeRing, islands)) return false;
-    const dist = CMGGeo.haversineNm(a, b);
-    const samples = CMGGeo.samplesOnSegment(a, b, Math.max(8, Math.ceil(dist * 14)));
-    for (const s of samples) {
-      if (!CMGGeo.onWater(s, lakeRing, islands)) return false;
-    }
-    return true;
+    return CMGGeo.segmentWet(a, b, lakeRing, islands);
   }
   function ringBounds(ring) {
     let minLon = 1e9, maxLon = -1e9, minLat = 1e9, maxLat = -1e9;
@@ -124,7 +118,7 @@
     let mode = "sail";
     if (Math.abs(twa) < NOGO) { bsp = 0; mode = "nogo"; }
     const toward = bsp;
-    const hours = bsp > 0.15 ? dist / bsp : (mode === "nogo" ? 0 : Infinity);
+    const hours = bsp > 0.15 ? dist / bsp : Infinity;
     const motorOffered = toward < 2 || mode === "nogo";
     const land = !segmentWet(a, b, lakeRing, islands);
     return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, color: colorForTwa(twa), twd: twd, tws: tws };
@@ -167,7 +161,9 @@
     const wet = [path[0]];
     for (let i = 0; i < path.length - 1; i++) {
       const a = wet[wet.length - 1], b = path[i + 1];
-      detourAround(a, b, lakeRing, islands).forEach(function (p) { wet.push(p); });
+      detourAround(a, b, lakeRing, islands).forEach(function (p) {
+        wet.push({ lat: p.lat, lon: p.lon, name: p.name || "Detour" });
+      });
       wet.push(b);
     }
     const expanded = [wet[0]];
@@ -196,7 +192,7 @@
       });
       if (isFinite(part.endHours)) tHours = Math.max(tHours, part.endHours);
     }
-    if (tHours <= 0 && nogoHit && nogoNm >= totalNm * 0.5) tHours = Infinity;
+    if (nogoHit && !hybrid) tHours = Infinity;
     return { points: expanded, segs, tHours, totalNm, sailNm, motorNm, nogoNm, motorUsed, landHit, nogoHit, pctVmg2: totalNm ? 100*vmg2/totalNm : 0, pctVmg4: totalNm ? 100*vmg4/totalNm : 0 };
   }
   w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, MOTOR_KN, NOGO };
