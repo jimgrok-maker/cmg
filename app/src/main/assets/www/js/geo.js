@@ -75,11 +75,10 @@
     return true;
   }
   function samplesOnSegment(a, b, n) {
+    const dist = haversineNm(a, b);
+    const brg = initialBearing(a, b);
     const out = [];
-    for (let i = 1; i < n; i++) {
-      const t = i / n;
-      out.push({ lat: a.lat + (b.lat - a.lat) * t, lon: a.lon + (b.lon - a.lon) * t });
-    }
+    for (let i = 1; i < n; i++) out.push(destPoint(a, brg, dist * (i / n)));
     return out;
   }
   // Listed docks sit inside padded keep-off hulls. Allow a short exit or

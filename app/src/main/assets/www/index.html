@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#101816" />
   <title>CMG — Course Made Good</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
@@ -62,11 +62,8 @@
               <option value="manual">Manual TWD / TWS</option>
             </select>
           </label>
-          <label>Depth chart
-            <select id="depth">
-              <option value="noaa">NOAA ENC / BlueTopo — shoreline only</option>
-              <option value="chs">CHS note — shoreline only</option>
-            </select>
+          <label>Depths
+            <span class="disclaimer">Not in this app. Use a NOAA or CHS chart.</span>
           </label>
         </div>
         <div class="row" style="margin-top:0.45rem">
@@ -149,7 +146,7 @@
       </section>
     </div>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
   <script src="js/fence.js"></script>
   <script src="data/lakes.js"></script>
   <script src="data/islands.js"></script>

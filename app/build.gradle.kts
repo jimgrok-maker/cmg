@@ -10,13 +10,16 @@ android {
         applicationId = "com.cmg.erie"
         minSdk = 26
         targetSdk = 34
-        versionCode = 25
-        versionName = "0.3.4"
+        versionCode = 26
+        versionName = "0.3.5"
     }
 
     buildTypes {
         debug { isMinifyEnabled = false }
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     compileOptions {

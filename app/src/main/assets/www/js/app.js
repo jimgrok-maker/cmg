@@ -2,7 +2,7 @@
   const STORE = "cmg.v1";
   const TRACK_STORE = "cmg.track.v1";
   const state = {
-    lakeId: "erie", windSource: "hrrr", depth: "noaa", boatId: "mac26x", genericLwl: 23,
+    lakeId: "erie", windSource: "hrrr", boatId: "mac26x", genericLwl: 23,
     magnetic: false, hybrid: false, tws: 10, twd: 270,
     windPack: null, windField: null, departMs: Date.now(), waypoints: [], lakeRing: null, islands: [], route: null, outline: null
   };
@@ -164,7 +164,6 @@
   function bindSetup() {
     document.getElementById("lake").value = state.lakeId || "erie";
     document.getElementById("windSource").value = state.windSource;
-    document.getElementById("depth").value = state.depth;
     document.getElementById("boat").value = state.boatId;
     document.getElementById("genericLwl").value = state.genericLwl;
     document.getElementById("genericWrap").classList.toggle("hidden", state.boatId !== "generic");
@@ -448,9 +447,18 @@
     if (map) return;
     const Ldef = lake();
     map = L.map("map", { zoomControl: true, fadeAnimation: false }).setView(Ldef.center, Ldef.zoom);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 16, attribution: "&copy; OpenStreetMap", updateWhenIdle: false, keepBuffer: 2
     }).addTo(map);
+    tiles.on("tileerror", function () {
+      if (document.getElementById("tileNote")) return;
+      const n = document.createElement("div");
+      n.id = "tileNote";
+      n.className = "chip";
+      n.style.cssText = "position:absolute;z-index:500;left:8px;right:8px;top:8px";
+      n.textContent = "Map tiles need a connection. Marks and the fence still work.";
+      document.getElementById("mapWrap").appendChild(n);
+    });
     islandLayer = L.layerGroup().addTo(map);
     poiLayer = L.layerGroup().addTo(map);
     routeLayer = L.layerGroup().addTo(map);
@@ -490,6 +498,13 @@
       });
     });
   }
+  window.CMGOnBack = function () {
+    const planner = document.getElementById("planner");
+    if (planner && !planner.classList.contains("hidden")) { showSetup(true); return true; }
+    const faq = document.getElementById("faqPane");
+    if (faq && !faq.classList.contains("hidden")) { showFaq(false); return true; }
+    return false;
+  };
   document.addEventListener("DOMContentLoaded", function () {
     loadPrefs(); loadTrack(); fillLakes(); renderBoatOptions(); bindSetup(); startGps();
     document.getElementById("poi").onchange = function () {
@@ -509,7 +524,6 @@
     };
     document.getElementById("genericLwl").onchange = function (e) { state.genericLwl = Number(e.target.value) || 23; bindSetup(); };
     document.getElementById("windSource").onchange = function (e) { state.windSource = e.target.value; state.windField = null; };
-    document.getElementById("depth").onchange = function (e) { state.depth = e.target.value; };
     document.getElementById("mag").onchange = function (e) { state.magnetic = e.target.checked; compute(); };
     document.getElementById("tws").oninput = function (e) { state.tws = Number(e.target.value); compute(true); };
     document.getElementById("twd").oninput = function (e) { state.twd = Number(e.target.value); compute(true); };
