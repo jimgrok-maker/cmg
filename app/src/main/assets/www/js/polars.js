@@ -1,5 +1,5 @@
 (function (w) {
-  const TWA_SHAPE = [[32,0.36],[38,0.48],[45,0.58],[52,0.66],[60,0.74],[70,0.82],[80,0.88],[90,0.92],[100,0.95],[110,0.96],[120,0.94],[135,0.92],[150,0.90],[165,0.88],[180,0.86]];
+  const TWA_SHAPE = [[32,0.36],[38,0.56],[45,0.74],[52,0.84],[60,0.88],[70,0.90],[80,0.90],[90,0.94],[100,0.96],[110,0.96],[120,0.94],[135,0.92],[150,0.90],[165,0.88],[180,0.86]];
   function hullSpeed(lwlFt) { return 1.34 * Math.sqrt(Math.max(8, lwlFt)); }
   function windScale(tws, twa) {
     let s;
@@ -34,7 +34,7 @@
     return TWA_SHAPE[TWA_SHAPE.length-1][1];
   }
   const CLASSES = {
-    mac26x: { id:"mac26x", name:"MacGregor 26X", loa:25.82, lwl:23.0, draft:5.5, phrf:219, notes:"Board down. Ballast full. Working sails.", upwind:0.90, reach:1.02, run:0.96 },
+    mac26x: { id:"mac26x", name:"MacGregor 26X", loa:25.82, lwl:23.0, draft:5.5, phrf:219, notes:"Board down. Ballast full. Working sails.", upwind:0.96, reach:1.02, run:0.96 },
     cat22: { id:"cat22", name:"Catalina 22", loa:21.5, lwl:19.33, draft:5.0, phrf:273, notes:"Working sails.", upwind:1.00, reach:0.98, run:0.98 },
     cat30: { id:"cat30", name:"Catalina 30", loa:29.92, lwl:25.0, draft:5.25, phrf:192, notes:"Working sails.", upwind:1.02, reach:1.00, run:1.00 },
     hun34: { id:"hun34", name:"Hunter 34", loa:34.42, lwl:28.21, draft:5.5, phrf:150, notes:"Working sails.", upwind:1.04, reach:1.02, run:1.00 },
