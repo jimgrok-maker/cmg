@@ -75,6 +75,18 @@
           </label>
         </div>
         <p id="boatMeta" class="disclaimer"></p>
+        <label style="margin-top:0.45rem">Motor avg (kn)
+          <select id="motorKn">
+            <option value="2">2 — idle, save fuel</option>
+            <option value="3">3</option>
+            <option value="4" selected>4 — default</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8 — hull speed-ish</option>
+          </select>
+        </label>
+        <p class="disclaimer">Used for a dashed no-go, and for hybrid if a sail leg is under 2 kn. Lower is a fuel save, not a faster trip.</p>
         <label style="margin-top:0.4rem;flex-direction:row;align-items:center;gap:0.45rem;text-transform:none">
           <input type="checkbox" id="mag" /> Magnetic courses (<span id="varLabel">Var 7.6°W</span>)
         </label>
@@ -137,7 +149,7 @@
         <p id="windLabel" class="disclaimer"></p>
         <p id="polarDelta" class="disclaimer"></p>
         <label style="flex-direction:row;align-items:center;gap:0.45rem;text-transform:none;margin:0.3rem 0">
-          <input type="checkbox" id="hybrid" /> Hybrid compare — motor 4 kn if VMG < 2 kn
+          <input type="checkbox" id="hybrid" /> Hybrid compare — motor at the setup speed if VMG < 2 kn
         </label>
         <div class="stats" id="stats"></div>
         <p id="routeWarn" class="chip hidden"></p>
