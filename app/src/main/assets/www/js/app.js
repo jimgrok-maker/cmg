@@ -362,13 +362,20 @@
       }
       acc = end;
     });
+    rt.segs.forEach(function (s) {
+      var start = (s.startH != null) ? s.startH : 0;
+      var midH = start + ((isFinite(s.hours) && s.hours > 0) ? s.hours / 2 : 0);
+      var lat = (s.from.lat + s.to.lat) / 2, lon = (s.from.lon + s.to.lon) / 2;
+      if (marks.some(function (m) { return Math.abs(m.lat - lat) < 0.04 && Math.abs(m.lon - lon) < 0.04; })) return;
+      addMark(midH, lat, lon);
+    });
     marks.sort(function (a, b) { return a.h - b.h; });
     marks.forEach(function (m) {
-      var seg = null;
+      var seg = null, best = 1e9;
       rt.segs.forEach(function (s) {
-        var start = (s.startH != null) ? s.startH : 0;
-        var end = start + (isFinite(s.hours) ? s.hours : 0);
-        if (m.h + 1e-6 >= start && m.h <= end + 0.08) seg = s;
+        var lat = (s.from.lat + s.to.lat) / 2, lon = (s.from.lon + s.to.lon) / 2;
+        var d = Math.abs(m.lat - lat) + Math.abs(m.lon - lon);
+        if (d < best) { best = d; seg = s; }
       });
       var live = windAtHours(m.h, m);
       var w = (seg && seg.twd != null) ? { twd: seg.twd, tws: seg.tws, gust: live.gust, clock: live.clock } : live;
@@ -401,7 +408,8 @@
     }
     const rt = CMGRoute.buildRoute(state.waypoints, boat(), state.tws, state.twd, state.lakeRing, state.islands, state.hybrid, windAtHours);
     state.route = rt; publishRoute(rt); drawRoute(rt); drawWindArrows(rt);
-    const avg = (isFinite(rt.tHours) && rt.tHours > 0) ? (rt.totalNm / rt.tHours) : 0;
+    const sailed = (rt.sailNm || 0) + (rt.motorNm || 0);
+    const avg = (isFinite(rt.tHours) && rt.tHours > 0) ? (sailed / rt.tHours) : 0;
     setHud(avg ? avg.toFixed(1) : "\u2014", fmtHrs(rt.tHours));
     out.innerHTML =
       '<div class="stat"><b>' + rt.totalNm.toFixed(1) + '</b><span>nm sailed</span></div>' +
