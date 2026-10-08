@@ -118,7 +118,7 @@
     let mode = "sail";
     if (Math.abs(twa) < NOGO) { bsp = 0; mode = "nogo"; }
     const toward = bsp;
-    const hours = bsp > 0.15 ? dist / bsp : (mode === "nogo" ? 0 : Infinity);
+    const hours = bsp > 0.15 ? dist / bsp : (mode === "nogo" ? dist / MOTOR_KN : Infinity);
     const motorOffered = toward < 2 || mode === "nogo";
     const land = !segmentWet(a, b, lakeRing, islands);
     return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, color: colorForTwa(twa), twd: twd, tws: tws };
@@ -181,7 +181,7 @@
       const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback);
       part.segs.forEach(function (ev) {
         if (ev.mode === "motor") { motorUsed = true; motorNm += ev.dist; }
-        else if (ev.mode === "nogo") { nogoHit = true; nogoNm += ev.dist; }
+        else if (ev.mode === "nogo") { nogoHit = true; nogoNm += ev.dist; motorNm += ev.dist; }
         else sailNm += ev.dist;
         if (ev.land) landHit = true;
         if (isFinite(ev.hours) && ev.hours > 0) tHours += ev.hours;
