@@ -12,7 +12,7 @@
     if (a < 55) return "#c47b2b";
     if (a < 80) return "#c9b23a";
     if (a < 140) return "#3d9a6a";
-    if (a < 165) return "#c9b23a";
+    if (a < 165) return "#5b7c99";
     return "#8a6b3a";
   }
   function segmentWet(a, b, lakeRing, islands) {
