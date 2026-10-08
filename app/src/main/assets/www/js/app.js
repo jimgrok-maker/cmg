@@ -3,7 +3,7 @@
   const TRACK_STORE = "cmg.track.v1";
   const state = {
     lakeId: "erie", windSource: "hrrr", boatId: "mac26x", genericLwl: 23,
-    magnetic: false, hybrid: false, tws: 10, twd: 270,
+    magnetic: false, hybrid: false, motorKn: 4, tws: 10, twd: 270,
     windPack: null, windField: null, departMs: Date.now(), waypoints: [], lakeRing: null, islands: [], route: null, outline: null
   };
   let map, routeLayer, wpLayer, islandLayer, windLayer, poiLayer;
@@ -28,7 +28,7 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         lakeId: state.lakeId, boatId: state.boatId, genericLwl: state.genericLwl,
-        windSource: state.windSource, magnetic: state.magnetic
+        windSource: state.windSource, magnetic: state.magnetic, motorKn: state.motorKn
       }));
     } catch (e) {}
   }
@@ -40,6 +40,7 @@
       if (p.genericLwl) state.genericLwl = p.genericLwl;
       if (p.windSource) state.windSource = p.windSource;
       if (typeof p.magnetic === "boolean") state.magnetic = p.magnetic;
+      if (p.motorKn >= 2 && p.motorKn <= 8) state.motorKn = p.motorKn;
     } catch (e) {}
   }
   function loadTrack() {
@@ -172,6 +173,7 @@
     document.getElementById("genericLwl").value = state.genericLwl;
     document.getElementById("genericWrap").classList.toggle("hidden", state.boatId !== "generic");
     document.getElementById("mag").checked = state.magnetic;
+    const mk = document.getElementById("motorKn"); if (mk) mk.value = String(state.motorKn || 4);
     document.getElementById("varLabel").textContent = "Var " + lake().variationW.toFixed(1) + "\u00b0W";
     document.getElementById("setupTitle").textContent = lake().name;
     document.getElementById("headerSub").textContent = lake().name;
@@ -406,7 +408,7 @@
       setHud("\u2014", "\u2014");
       return;
     }
-    const rt = CMGRoute.buildRoute(state.waypoints, boat(), state.tws, state.twd, state.lakeRing, state.islands, state.hybrid, windAtHours);
+    const rt = CMGRoute.buildRoute(state.waypoints, boat(), state.tws, state.twd, state.lakeRing, state.islands, state.hybrid, windAtHours, state.motorKn);
     state.route = rt; publishRoute(rt); drawRoute(rt); drawWindArrows(rt);
     const sailed = (rt.sailNm || 0) + (rt.motorNm || 0);
     const avg = (isFinite(rt.tHours) && rt.tHours > 0) ? (sailed / rt.tHours) : 0;
@@ -420,8 +422,8 @@
       '<div class="stat"><b>' + (rt.motorUsed ? "yes" : "no") + '</b><span>motor offered</span></div>';
     const warn = [];
     if (rt.landHit) warn.push("A leg crosses land or an island \u2014 add a waypoint.");
-    if (rt.nogoHit && !state.hybrid && (rt.nogoNm||0) >= 0.2) warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, cannot sail. " + fmtHrs(rt.nogoNm / 4) + " motor at 4 kn is included in the P50.");
-    if (rt.motorUsed) warn.push("VMG < 2 kn on a leg; motor at 4 kn used in hybrid compare.");
+    if (rt.nogoHit && !state.hybrid && (rt.nogoNm||0) >= 0.2) warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, cannot sail. " + fmtHrs(rt.nogoNm / state.motorKn) + " motor at " + state.motorKn + " kn is included in the P50.");
+    if (rt.motorUsed) warn.push("VMG < 2 kn on a leg; motor at " + state.motorKn + " kn used in hybrid compare.");
     const rw = document.getElementById("routeWarn");
     rw.innerHTML = warn.join(" "); rw.classList.toggle("hidden", warn.length === 0);
     updatePolarDelta();
@@ -549,6 +551,7 @@
     document.getElementById("genericLwl").onchange = function (e) { state.genericLwl = Number(e.target.value) || 23; bindSetup(); };
     document.getElementById("windSource").onchange = function (e) { state.windSource = e.target.value; state.windField = null; };
     document.getElementById("mag").onchange = function (e) { state.magnetic = e.target.checked; compute(); };
+    document.getElementById("motorKn").onchange = function (e) { state.motorKn = Number(e.target.value) || 4; save(); compute(); };
     document.getElementById("tws").oninput = function (e) { state.tws = Number(e.target.value); compute(true); };
     document.getElementById("twd").oninput = function (e) { state.twd = Number(e.target.value); compute(true); };
     document.getElementById("hybrid").onchange = function (e) { state.hybrid = e.target.checked; compute(true); };
