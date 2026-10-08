@@ -237,7 +237,7 @@
     routeLayer.clearLayers();
     if (!rt) return;
     rt.segs.forEach(function (s) {
-      L.polyline([[s.from.lat, s.from.lon], [s.to.lat, s.to.lon]], { color:s.color, weight:s.land?2:5, dashArray:s.land?"6 6":null, opacity:0.95 })
+      L.polyline([[s.from.lat, s.from.lon], [s.to.lat, s.to.lon]], { color:s.color, weight:(s.land||s.mode==="nogo")?3:5, dashArray:(s.land||s.mode==="nogo")?"8 7":null, opacity:0.95 })
         .addTo(routeLayer).bindTooltip(
           fmtCrs(s.course) + " \u00b7 " + s.dist.toFixed(2) + " nm \u00b7 TWA " + Math.round(s.twa) + "\u00b0 \u00b7 " +
           (s.mode==="motor" ? "motor 4 kn" : s.bsp.toFixed(1)+" kn") +
