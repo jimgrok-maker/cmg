@@ -46,7 +46,10 @@
   async function fetchMany(points, source, tz) {
     const pts = (points || []).slice(0, 12);
     if (!pts.length) return [];
-    let packs = [];
+    // Index each returned pack by its requested position in a sparse slots
+    // array, so the back-fill below can tell which waypoints the batch
+    // actually covered even when the API returns fewer points than asked.
+    const slots = new Array(pts.length).fill(null);
     try {
       const lats = pts.map(function (p) { return p.lat.toFixed(4); }).join(",");
       const lons = pts.map(function (p) { return p.lon.toFixed(4); }).join(",");
@@ -54,31 +57,29 @@
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : [data];
-        // The API can return fewer points than requested (rate limit or
-        // partial failure). Pair each pack with its own position: use the
-        // echoed coordinates when present, otherwise the requested one.
-        packs = list.map(function (d, i) {
-          const lat0 = d && d.latitude != null ? d.latitude : pts[i] ? pts[i].lat : null;
-          const lon0 = d && d.longitude != null ? d.longitude : pts[i] ? pts[i].lon : null;
-          if (d == null || lat0 == null || lon0 == null) return null;
+        list.forEach(function (d, i) {
+          if (i >= pts.length || d == null) return;
+          // Open-Meteo echoes the requested coordinate on multi-point calls;
+          // trust it over position when it is present and finite.
+          let lat0 = d.latitude, lon0 = d.longitude;
+          if (lat0 == null) lat0 = pts[i].lat;
+          if (lon0 == null) lon0 = pts[i].lon;
+          if (!isFinite(lat0) || !isFinite(lon0)) return;
           const pk = packFrom(d, source, tz, lat0, lon0);
-          if (!isFinite(pk.lat) || !isFinite(pk.lon)) return null;
-          return pk;
-        }).filter(function (pk) { return pk; });
+          if (!isFinite(pk.lat) || !isFinite(pk.lon)) return;
+          slots[i] = pk;
+        });
       }
     } catch (e) {}
-    if (packs.length >= pts.length) {
-      saveField(packs);
-      return packs;
+    const have = slots.filter(Boolean);
+    if (have.length >= pts.length) {
+      saveField(have);
+      return have;
     }
-    const out = packs.slice();
+    const out = have.slice();
     for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      const already = out.some(function (pk) {
-        return CMGGeo.haversineNm({ lat: pk.lat, lon: pk.lon }, p) < 2;
-      });
-      if (already) continue;
-      try { out.push(await fetchForecast(p.lat, p.lon, source, tz)); } catch (e) {}
+      if (slots[i]) continue; // this waypoint already has its cell
+      try { out.push(await fetchForecast(pts[i].lat, pts[i].lon, source, tz)); } catch (e) {}
     }
     if (out.length) saveField(out);
     return out;
@@ -141,7 +142,13 @@
     const tws = pack.hourly.tws[best];
     const twd = pack.hourly.twd[best];
     if (!isFinite(tws) || !isFinite(twd)) return null;
-    return { tws: tws, twd: twd, gust: pack.hourly.gust[best], code: pack.hourly.code[best], time: times[best], ageH: bestD / 3600000 };
+    const gust = pack.hourly.gust[best];
+    return {
+      tws: tws, twd: twd,
+      gust: isFinite(gust) ? gust : null,
+      code: pack.hourly.code[best],
+      time: times[best], ageH: bestD / 3600000
+    };
   }
   function nearestPack(field, lat, lon) {
     if (!field || !field.length) return null;
