@@ -363,7 +363,17 @@
       acc = end;
     });
     marks.sort(function (a, b) { return a.h - b.h; });
-    marks.forEach(function (m) { placeWindArrow(m.lat, m.lon, m.h, windAtHours(m.h, m)); });
+    marks.forEach(function (m) {
+      var seg = null;
+      rt.segs.forEach(function (s) {
+        var start = (s.startH != null) ? s.startH : 0;
+        var end = start + (isFinite(s.hours) ? s.hours : 0);
+        if (m.h + 1e-6 >= start && m.h <= end + 0.08) seg = s;
+      });
+      var live = windAtHours(m.h, m);
+      var w = (seg && seg.twd != null) ? { twd: seg.twd, tws: seg.tws, gust: live.gust, clock: live.clock } : live;
+      placeWindArrow(m.lat, m.lon, m.h, w);
+    });
   }
   function publishRoute(rt) {
     window.CMGGetRoute = function () {
@@ -402,7 +412,7 @@
       '<div class="stat"><b>' + (rt.motorUsed ? "yes" : "no") + '</b><span>motor offered</span></div>';
     const warn = [];
     if (rt.landHit) warn.push("A leg crosses land or an island \u2014 add a waypoint.");
-    if (rt.nogoHit && !state.hybrid) warn.push("Sail-only no-go on a leg \u2014 P50 blanked. Add a tack or turn on hybrid.");
+    if (rt.nogoHit && !state.hybrid && (rt.nogoNm||0) >= 0.2) warn.push("Sail-only no-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 left out of the P50. Add a tack or turn on hybrid.");
     if (rt.motorUsed) warn.push("VMG < 2 kn on a leg; motor at 4 kn used in hybrid compare.");
     const rw = document.getElementById("routeWarn");
     rw.innerHTML = warn.join(" "); rw.classList.toggle("hidden", warn.length === 0);
