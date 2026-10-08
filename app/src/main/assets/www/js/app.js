@@ -349,7 +349,7 @@
     const marks = [];
     function addMark(h, lat, lon) {
       const hh = Math.round(h * 10) / 10;
-      if (marks.some(function (m) { return Math.abs(m.h - hh) < 0.2; })) return;
+      if (marks.some(function (m) { return Math.abs(m.h - hh) < 0.6; })) return;
       marks.push({ h: hh, lat: lat, lon: lon });
     }
     addMark(0, rt.segs[0].from.lat, rt.segs[0].from.lon);
@@ -367,11 +367,11 @@
       acc = end;
     });
     rt.segs.forEach(function (s) {
+      if (s.mode !== "nogo" && s.mode !== "motor") return;
       var start = (s.startH != null) ? s.startH : 0;
       var midH = start + ((isFinite(s.hours) && s.hours > 0) ? s.hours / 2 : 0);
-      var lat = (s.from.lat + s.to.lat) / 2, lon = (s.from.lon + s.to.lon) / 2;
-      if (marks.some(function (m) { return Math.abs(m.lat - lat) < 0.04 && Math.abs(m.lon - lon) < 0.04; })) return;
-      addMark(midH, lat, lon);
+      if (marks.some(function (m) { return Math.abs(m.h - midH) < 0.6; })) return;
+      addMark(midH, (s.from.lat + s.to.lat) / 2, (s.from.lon + s.to.lon) / 2);
     });
     marks.sort(function (a, b) { return a.h - b.h; });
     marks.forEach(function (m) {
