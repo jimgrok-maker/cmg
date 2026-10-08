@@ -95,7 +95,7 @@
         <h3>No cell signal</h3>
         <p>The last center forecast and the last 12-cell field are saved on the phone. Offline, CMG keeps using them and marks the age. A refresh runs every 60 minutes when a fetch works.</p>
         <h3>P50 / P90</h3>
-        <p>P50 is polar time in the forecast we have. P90 is that time × 1.22 — lulls, slop, and a forecast that was 20° off. Not a second model. A sail-only no-go leg blanks P50 instead of showing 0h 00m.</p>
+        <p>P50 is polar time in the forecast we have. P90 is that time × 1.22 — lulls, slop, and a forecast that was 20° off. Not a second model. A sail-only no-go leg is drawn dashed and left out of the P50. The clock is the solid line only.</p>
         <h3>SOG vs polar</h3>
         <p>After about 20 minutes of GPS motion, CMG compares live SOG to the planned polar average.</p>
         <h3>Motor policy</h3>
@@ -114,8 +114,9 @@
         <div class="legend">
           <span><i style="background:#3d9a6a"></i>reach</span>
           <span><i style="background:#c9b23a"></i>tight</span>
+          <span><i style="background:#e07a2f"></i>pinched</span>
           <span><i style="background:#5b7c99"></i>deep</span>
-          <span><i style="background:#8a6b3a"></i>run</span>
+          <span><i style="background:#6b4423"></i>run</span>
           <span><i style="background:#b54a3c"></i>no-go</span>
           <span><i style="background:#6b8ea8"></i>motor</span>
           <span><i style="background:#f0d060"></i>GPS track</span>
