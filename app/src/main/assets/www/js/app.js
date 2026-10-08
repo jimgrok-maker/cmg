@@ -420,7 +420,7 @@
       '<div class="stat"><b>' + (rt.motorUsed ? "yes" : "no") + '</b><span>motor offered</span></div>';
     const warn = [];
     if (rt.landHit) warn.push("A leg crosses land or an island \u2014 add a waypoint.");
-    if (rt.nogoHit && !state.hybrid && (rt.nogoNm||0) >= 0.2) warn.push("Sail-only no-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 left out of the P50. Add a tack or turn on hybrid.");
+    if (rt.nogoHit && !state.hybrid && (rt.nogoNm||0) >= 0.2) warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, cannot sail. " + fmtHrs(rt.nogoNm / 4) + " motor at 4 kn is included in the P50.");
     if (rt.motorUsed) warn.push("VMG < 2 kn on a leg; motor at 4 kn used in hybrid compare.");
     const rw = document.getElementById("routeWarn");
     rw.innerHTML = warn.join(" "); rw.classList.toggle("hidden", warn.length === 0);
