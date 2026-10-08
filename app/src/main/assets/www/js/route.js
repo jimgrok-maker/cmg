@@ -118,7 +118,7 @@
     let mode = "sail";
     if (Math.abs(twa) < NOGO) { bsp = 0; mode = "nogo"; }
     const toward = bsp;
-    const hours = bsp > 0.15 ? dist / bsp : Infinity;
+    const hours = bsp > 0.15 ? dist / bsp : (mode === "nogo" ? 0 : Infinity);
     const motorOffered = toward < 2 || mode === "nogo";
     const land = !segmentWet(a, b, lakeRing, islands);
     return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, color: colorForTwa(twa), twd: twd, tws: tws };
@@ -192,7 +192,7 @@
       });
       if (isFinite(part.endHours)) tHours = Math.max(tHours, part.endHours);
     }
-    if (nogoHit && !hybrid) tHours = Infinity;
+    if (tHours <= 0 && nogoHit && nogoNm >= totalNm * 0.5) tHours = Infinity;
     return { points: expanded, segs, tHours, totalNm, sailNm, motorNm, nogoNm, motorUsed, landHit, nogoHit, pctVmg2: totalNm ? 100*vmg2/totalNm : 0, pctVmg4: totalNm ? 100*vmg4/totalNm : 0 };
   }
   w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, MOTOR_KN, NOGO };
