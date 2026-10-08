@@ -1,18 +1,26 @@
 (function (w) {
-  const TWA_SHAPE = [[32,0.36],[38,0.48],[45,0.58],[52,0.66],[60,0.74],[70,0.82],[80,0.88],[90,0.92],[100,0.95],[110,0.96],[120,0.94],[135,0.86],[150,0.74],[165,0.60],[180,0.50]];
+  const TWA_SHAPE = [[32,0.36],[38,0.48],[45,0.58],[52,0.66],[60,0.74],[70,0.82],[80,0.88],[90,0.92],[100,0.95],[110,0.96],[120,0.94],[135,0.92],[150,0.90],[165,0.88],[180,0.86]];
   function hullSpeed(lwlFt) { return 1.34 * Math.sqrt(Math.max(8, lwlFt)); }
-  function windScale(tws) {
-    if (tws <= 3) return 0.22;
-    if (tws >= 22) return 1.02;
-    const knots = [4,6,8,10,12,14,16,18,20,22];
-    const sc = [0.38,0.55,0.70,0.84,0.96,1.04,1.08,1.10,1.08,1.02];
-    for (let i = 1; i < knots.length; i++) {
-      if (tws <= knots[i]) {
-        const t = (tws - knots[i-1]) / (knots[i] - knots[i-1]);
-        return sc[i-1] + t * (sc[i] - sc[i-1]);
+  function windScale(tws, twa) {
+    let s;
+    if (tws <= 3) s = 0.22;
+    else if (tws >= 22) s = 1.02;
+    else {
+      const knots = [4,6,8,10,12,14,16,18,20,22];
+      const sc = [0.38,0.55,0.70,0.84,0.96,1.04,1.08,1.10,1.08,1.02];
+      s = 1;
+      for (let i = 1; i < knots.length; i++) {
+        if (tws <= knots[i]) {
+          const t = (tws - knots[i-1]) / (knots[i] - knots[i-1]);
+          s = sc[i-1] + t * (sc[i] - sc[i-1]);
+          break;
+        }
       }
     }
-    return 1;
+    const a = Math.abs(twa || 0);
+    if (a >= 140 && tws >= 16) s = Math.max(s, 1.10);
+    if (a >= 140 && tws >= 22) s = Math.max(s, 1.18);
+    return s;
   }
   function shapeAt(twa) {
     const a = Math.min(180, Math.abs(twa));
@@ -40,7 +48,7 @@
   }
   function boatSpeed(cls, tws, twa) {
     const vh = hullSpeed(cls.lwl);
-    return Math.min(vh * 1.05, Math.max(0, vh * shapeAt(twa) * windScale(tws) * classFactor(cls, twa)));
+    return Math.min(vh * 1.05, Math.max(0, vh * shapeAt(twa) * windScale(tws, twa) * classFactor(cls, twa)));
   }
   function vmgToWind(cls, tws, twa) { return boatSpeed(cls, tws, twa) * Math.cos(CMGGeo.toRad(twa)); }
   function bestUpwindTwa(cls, tws) {
