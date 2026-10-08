@@ -86,7 +86,14 @@
             <option value="8">8 — hull speed-ish</option>
           </select>
         </label>
-        <p class="disclaimer">Used for a dashed no-go, and for hybrid if a sail leg is under 2 kn. Lower is a fuel save, not a faster trip.</p>
+        <p class="disclaimer">Motor speed used when a plan motors. Lower is a fuel save, not a faster trip.</p>
+        <label style="margin-top:0.45rem">Plan
+          <select id="plan">
+            <option value="sail" selected>Maximize sailing time</option>
+            <option value="fast">Maximize fastest time to destination</option>
+          </select>
+        </label>
+        <p class="disclaimer">Sailing leaves a dashed no-go out of the clock — tack around it. Fastest motors any leg the engine would finish sooner, including the dash, at the speed above.</p>
         <label style="margin-top:0.4rem;flex-direction:row;align-items:center;gap:0.45rem;text-transform:none">
           <input type="checkbox" id="mag" /> Magnetic courses (<span id="varLabel">Var 7.6°W</span>)
         </label>
