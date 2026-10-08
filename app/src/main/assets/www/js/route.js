@@ -9,11 +9,11 @@
   function colorForTwa(twa) {
     const a = Math.abs(twa);
     if (a < NOGO) return "#b54a3c";
-    if (a < 55) return "#c47b2b";
+    if (a < 55) return "#e07a2f";
     if (a < 80) return "#c9b23a";
     if (a < 140) return "#3d9a6a";
     if (a < 165) return "#5b7c99";
-    return "#8a6b3a";
+    return "#6b4423";
   }
   function segmentWet(a, b, lakeRing, islands) {
     return CMGGeo.segmentWet(a, b, lakeRing, islands);
