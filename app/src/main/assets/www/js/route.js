@@ -110,7 +110,8 @@
     const preferStbd = CMGGeo.angleDiff(stbd, destBrg) <= CMGGeo.angleDiff(port, destBrg);
     return [preferStbd ? stbdFirst : portFirst];
   }
-  function evaluateSegment(a, b, cls, tws, twd, lakeRing, islands) {
+  function evaluateSegment(a, b, cls, tws, twd, lakeRing, islands, motorKn) {
+    const mkn = (motorKn >= 2 && motorKn <= 8) ? motorKn : MOTOR_KN;
     const course = CMGGeo.initialBearing(a, b);
     const dist = CMGGeo.haversineNm(a, b);
     const twa = twaForCourse(twd, course);
@@ -118,12 +119,13 @@
     let mode = "sail";
     if (Math.abs(twa) < NOGO) { bsp = 0; mode = "nogo"; }
     const toward = bsp;
-    const hours = bsp > 0.15 ? dist / bsp : (mode === "nogo" ? dist / MOTOR_KN : Infinity);
+    const hours = bsp > 0.15 ? dist / bsp : (mode === "nogo" ? dist / mkn : Infinity);
     const motorOffered = toward < 2 || mode === "nogo";
     const land = !segmentWet(a, b, lakeRing, islands);
     return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, color: colorForTwa(twa), twd: twd, tws: tws };
   }
-  function splitByHour(a, b, cls, lakeRing, islands, hybrid, startHours, windAtFn, fallback) {
+  function splitByHour(a, b, cls, lakeRing, islands, hybrid, startHours, windAtFn, fallback, motorKn) {
+    const mkn = (motorKn >= 2 && motorKn <= 8) ? motorKn : MOTOR_KN;
     const out = [];
     let cursor = a;
     let acc = isFinite(startHours) ? startHours : 0;
@@ -132,9 +134,9 @@
       const w = windAtFn ? (windAtFn(acc, cursor) || fallback) : fallback;
       const tws = w.tws != null ? w.tws : fallback.tws;
       const twd = w.twd != null ? w.twd : fallback.twd;
-      const ev = evaluateSegment(cursor, b, cls, tws, twd, lakeRing, islands);
+      const ev = evaluateSegment(cursor, b, cls, tws, twd, lakeRing, islands, mkn);
       if (hybrid && ev.motorOffered) {
-        ev.mode = "motor"; ev.bsp = MOTOR_KN; ev.hours = ev.dist / MOTOR_KN; ev.color = "#6b8ea8"; ev.toward = MOTOR_KN;
+        ev.mode = "motor"; ev.bsp = mkn; ev.hours = ev.dist / mkn; ev.color = "#6b8ea8"; ev.toward = mkn;
       }
       if (!isFinite(ev.hours) || ev.hours <= 1.05 || ev.dist < 0.12 || ev.mode === "nogo") {
         ev.startH = acc;
@@ -144,9 +146,9 @@
       }
       const frac = 1 / ev.hours;
       const mid = { lat: cursor.lat + (b.lat - cursor.lat) * frac, lon: cursor.lon + (b.lon - cursor.lon) * frac };
-      const piece = evaluateSegment(cursor, mid, cls, tws, twd, lakeRing, islands);
+      const piece = evaluateSegment(cursor, mid, cls, tws, twd, lakeRing, islands, mkn);
       if (hybrid && piece.motorOffered) {
-        piece.mode = "motor"; piece.bsp = MOTOR_KN; piece.hours = piece.dist / MOTOR_KN; piece.color = "#6b8ea8"; piece.toward = MOTOR_KN;
+        piece.mode = "motor"; piece.bsp = mkn; piece.hours = piece.dist / mkn; piece.color = "#6b8ea8"; piece.toward = mkn;
       }
       piece.startH = acc;
       out.push(piece);
@@ -155,7 +157,7 @@
     }
     return { segs: out, endHours: acc };
   }
-  function buildRoute(waypoints, cls, tws, twd, lakeRing, islands, hybrid, windAtFn) {
+  function buildRoute(waypoints, cls, tws, twd, lakeRing, islands, hybrid, windAtFn, motorKn) {
     const fallback = { tws: tws, twd: twd };
     const path = waypoints.slice();
     const wet = [path[0]];
@@ -178,7 +180,7 @@
     const segs = [];
     let tHours = 0, sailNm = 0, motorNm = 0, nogoNm = 0, motorUsed = false, landHit = false, nogoHit = false, vmg2 = 0, vmg4 = 0, totalNm = 0;
     for (let i = 0; i < expanded.length - 1; i++) {
-      const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback);
+      const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback, motorKn);
       part.segs.forEach(function (ev) {
         if (ev.mode === "motor") { motorUsed = true; motorNm += ev.dist; }
         else if (ev.mode === "nogo") { nogoHit = true; nogoNm += ev.dist; motorNm += ev.dist; }
