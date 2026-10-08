@@ -11,6 +11,10 @@
   let gpsTrack = [];
   let fieldBusy = false, refreshTimer = null, movingSince = null, lastSogKn = null;
 
+  function buildStamp() {
+    const v = (window.CMGWind && window.CMGWind.BUILD) || "?";
+    return "build " + v;
+  }
   function lake() {
     if (typeof CMGLakeById === "function") return CMGLakeById(state.lakeId);
     return { id: state.lakeId || "erie", name: "Lake Erie", center: [41.66, -82.82], zoom: 9, variationW: 7.6, tz: "America/New_York", ring: [] };
@@ -410,7 +414,7 @@
     const src = state.windSource;
     const el = document.getElementById("windLabel");
     if (src === "manual") {
-      el.textContent = "Manual " + state.tws + " kn FROM " + String(Math.round(state.twd)).padStart(3,"0") + "\u00b0";
+      el.textContent = "Manual " + state.tws + " kn FROM " + String(Math.round(state.twd)).padStart(3,"0") + "\u00b0 \u00b7 " + buildStamp();
       compute();
       return;
     }
@@ -425,7 +429,8 @@
         document.getElementById("twd").value = Math.round(state.twd);
         const leave = Math.abs(clockMs() - Date.now()) < 120000 ? "now" : "at leave";
         el.textContent = src.toUpperCase() + " " + sample.tws.toFixed(0) + " kn FROM " +
-          String(Math.round(sample.twd)).padStart(3,"0") + "\u00b0 " + leave + " @ " + (sample.time || "").slice(11,16);
+          String(Math.round(sample.twd)).padStart(3,"0") + "\u00b0 " + leave + " @ " + (sample.time || "").slice(11,16) +
+          " \u00b7 " + buildStamp();
       }
     } catch (e) {
       const cached = CMGWind.loadCache();
@@ -439,7 +444,8 @@
         el.textContent = "Offline " + state.tws.toFixed(0) + " kn FROM " + Math.round(state.twd) + "\u00b0 \u00b7 " + age;
         const extra = windAgeText();
         if (extra) el.textContent += " \u00b7 " + extra;
-      } else el.textContent = "Wind fetch failed \u2014 using manual";
+        el.textContent += " \u00b7 " + buildStamp();
+      } else el.textContent = "Wind fetch failed \u2014 using manual \u00b7 " + buildStamp();
     }
     compute();
   }
