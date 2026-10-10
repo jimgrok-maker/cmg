@@ -4,12 +4,12 @@ Android sailing **trip planner** with a live SOG and gold GPS track. Not a websi
 
 Tap marks on an OSM map, get a polar-based course-made-good estimate from forecast wind, and see whether that rhumb stays inside a coarse shoreline. Always check official NOAA / CHS depths before you go.
 
-**Current build:** `0.3.5` (`versionCode` 26) · package `com.cmg.erie` · debug-signed.
+**Current build:** `0.3.17` (`versionCode` 38) · package `com.cmg.erie` · debug-signed.
 
 ## Install
 
 1. Repo → **Actions** → latest green **Build APK** run.
-2. Download the artifact **cmg-apk**. The file inside is `cmg-0.3.5-debug.apk`.
+2. Download the artifact **cmg-apk**. The file inside is `cmg-0.3.17-debug.apk`.
 3. On the phone, allow install from this source and tap the APK.
 
 Push to `main` or **Actions → Build APK → Run workflow** to rebuild.
@@ -18,80 +18,33 @@ Push to `main` or **Actions → Build APK → Run workflow** to rebuild.
 
 ### Waters
 
-Setup picker:
+Setup picker: Great Lakes (Erie, Ontario, Huron, Michigan, Superior), Chesapeake Bay, and the big Ohio inland lakes (Mosquito Creek, Buckeye, Alum Creek, Grand Lake St. Marys, Indian, Guilford).
 
-- Great Lakes: Erie, Ontario, Huron, Michigan, Superior
-- Chesapeake Bay
-- Ohio inland: Mosquito Creek, Buckeye, Alum Creek, Grand Lake St. Marys, Indian, Guilford
-
-Each water has a **hairline fence** (no fill) used only as a wet/dry test for *planned* rhumbs. OSM under the map is the real shore. GPS track ignores the fence.
-
-Western Lake Erie also has dashed keep-off hulls for Pelee, Middle Island, South / Middle / North Bass, Kelleys, Green, Rattlesnake. Those hulls are padded so a straight line does not cut an island. They are not the island shoreline.
-
-Listed ramps / harbors exist per water (Erie islands in more detail).
+Each water has a hairline fence used only as a wet/dry test for planned rhumbs. OSM under the map is the real shore. Western Lake Erie also has keep-off hulls for Pelee, Middle Island, the Bass islands, Kelleys, Green, and Rattlesnake.
 
 ### Wind
 
-- Sources: Open-Meteo **HRRR** (default), GFS, ECMWF, or manual TWD / TWS
-- TWD is meteorological **FROM**. Gold barbs point **downwind**. `Gxx` on a barb is gust knots at that hour.
-- Two-pass field on a route: guess with map-center wind, then sample up to **12 HRRR cells** along the track (~every 8 nm) and time each cell to when you are predicted to be there.
-- **Leave-at** clock (default now). Shift departure and every barb / polar hour moves with it. First barb says `dep` if leave-at is not “now.”
-- Center forecast and the 12-cell field are cached on the phone. Offline uses the last pack and labels it stale. Refresh every **60 minutes** when a fetch works.
+Open-Meteo HRRR (default), GFS, ECMWF, or manual. TWD is meteorological FROM. Gold barbs point downwind. One barb per hour. Gxx is gust knots. Up to 12 cells along the track, timed to when you are predicted to be there. Leave-at shifts every hour. Last pack is cached for offline. Refresh every 60 minutes.
 
-### Boats and routing
+### Plan
 
-Working-sail synthetic polars scaled to hull speed `1.34 × √LWL`:
+Setup has two plans and a motor-speed dropdown (2–8 kn, default 4):
 
-- MacGregor 26X (board down, full ballast)
-- Catalina 22, Catalina 30, Hunter 34, S2 8.0
-- Generic LWL formula
+- **Maximize sailing time.** Sail every leg you can. A no-go (under 45° off the wind) is dashed and left out of the clock and the average. Tack, or switch plans.
+- **Maximize fastest time.** A dashed no-go is still dashed, but those miles are in the P50 at the motor speed. A sail leg slower than the motor speed is drawn blue and timed at that speed.
 
-Default is **sail only**. Hybrid compare motors at 4 kn when VMG &lt; 2 kn. Goal band is 4 kn+ when the angle allows.
+No-go is 45°, not 40, so a few degrees of wind shift does not flip a west leg from dashed to solid. Pinched is 45–55°, tight 55–80°, reach 80–140°, deep 140–165°, run over 165°.
 
-No-go inside ~40° TWA (red). Tight yellow, reach green, motor blue. A sail-only no-go blanks P50 / P90 (`—`) instead of showing `0h 00m`.
-
-P50 is polar time in the forecast we have. P90 is that time × 1.22 (lulls / slop / a forecast that was 20° off — not a second model).
-
-Units: nautical miles and knots. Courses true unless Magnetic is checked (local variation west).
+P50 is polar time plus motor time on the fast plan. P90 is that time × 1.22. Units are nm and knots. Courses true unless Magnetic is checked.
 
 ### On the water
 
-- HUD: live **SOG kn** (GPS), planned **avg kn**, **to dest**
-- Gold polyline is the GPS wake, not the plan
-- After ~20 min underway, **SOG vs polar** (`+/− kn`)
-- Tap anywhere or pick a listed mark; two marks minimum for a plan
-- **Export GPX** shares the planned route to Files / OpenCPN
+HUD: live SOG, planned average, time to dest. Gold line is the GPS track. SOG vs polar after about 20 minutes underway. Export GPX shares the planned route.
 
 ## What it does not do
 
 - Official depths, buoys, or ENC
-- Currents, seiche, or lake breeze smaller than ~8 nm
-- Racing router with many tacks (one upwind tack attempt only)
+- Currents, seiche, or a lake breeze smaller than about 8 nm
+- A racing router with many tacks
 - Offset-rhumb compare (Pelee north vs south) — parked
 - Daylight / sunset gate — parked
-
-A wet rhumb that clips the fence draws dashed red and asks for another waypoint.
-
-## Layout
-
-Android WebView wrapping `app/src/main/assets/www`:
-
-```
-www/
-  index.html          Setup + planner shell + FAQ
-  css/app.css
-  data/lakes.js       Waters, centers, coarse rings
-  data/islands.js     Erie keep-off hulls
-  js/pois.js          Listed marks
-  js/geo.js           Distance, bearings, point-in-ring
-  js/polars.js        Classes + hull speed
-  js/wind.js          Open-Meteo + field cache
-  js/route.js         Polar CMG + island detour + no-go
-  js/fence.js         Hairline lake / island overlay
-  js/gpx-bind.js      GPX share
-  js/app.js           Map, HUD, GPS, leave-at
-```
-
-## FAQ in the app
-
-Setup → **FAQ** covers TWD FROM vs the barb, two-pass wind, leave-at, cache, P50/P90, motor policy, fence vs chart, GPX, and island limits.
