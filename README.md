@@ -4,12 +4,12 @@ Android sailing **trip planner** with a live SOG and gold GPS track. Not a websi
 
 Tap marks on an OSM map, get a polar-based course-made-good estimate from forecast wind, and see whether that rhumb stays inside a coarse shoreline. Always check official NOAA / CHS depths before you go.
 
-**Current build:** `0.3.17` (`versionCode` 38) · package `com.cmg.erie` · debug-signed.
+**Current build:** `0.3.18` (`versionCode` 39) · package `com.cmg.erie` · debug-signed.
 
 ## Install
 
 1. Repo → **Actions** → latest green **Build APK** run.
-2. Download the artifact **cmg-apk**. The file inside is `cmg-0.3.17-debug.apk`.
+2. Download the artifact **cmg-apk**. The file inside is `cmg-0.3.18-debug.apk`.
 3. On the phone, allow install from this source and tap the APK.
 
 Push to `main` or **Actions → Build APK → Run workflow** to rebuild.
@@ -46,5 +46,5 @@ HUD: live SOG, planned average, time to dest. Gold line is the GPS track. SOG vs
 - Official depths, buoys, or ENC
 - Currents, seiche, or a lake breeze smaller than about 8 nm
 - A racing router with many tacks
-- Offset-rhumb compare (Pelee north vs south) — parked
+- Offset 8 nm is on the planner: rhumb vs one windward mark vs one leeward mark. Not a new router.
 - Daylight / sunset gate — parked
