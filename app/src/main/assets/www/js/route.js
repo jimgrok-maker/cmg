@@ -1,5 +1,5 @@
 (function (w) {
-  const NOGO = 40;
+  const NOGO = 45;
   const MOTOR_KN = 4;
   function twaForCourse(twd, course) {
     let twa = CMGGeo.wrap360(course - twd);
@@ -185,7 +185,7 @@
       const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback, motorKn, plan);
       part.segs.forEach(function (ev) {
         if (ev.mode === "motor") { motorUsed = true; motorNm += ev.dist; }
-        else if (ev.mode === "nogo") { nogoHit = true; nogoNm += ev.dist; motorNm += ev.dist; }
+        else if (ev.mode === "nogo") { nogoHit = true; nogoNm += ev.dist; if (plan === "fast") motorNm += ev.dist; }
         else sailNm += ev.dist;
         if (ev.land) landHit = true;
         if (isFinite(ev.hours) && ev.hours > 0) tHours += ev.hours;
