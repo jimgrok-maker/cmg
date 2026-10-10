@@ -199,5 +199,27 @@
     if (tHours <= 0 && nogoHit && nogoNm >= totalNm * 0.5) tHours = Infinity;
     return { points: expanded, segs, tHours, totalNm, sailNm, motorNm, nogoNm, motorUsed, landHit, nogoHit, pctVmg2: totalNm ? 100*vmg2/totalNm : 0, pctVmg4: totalNm ? 100*vmg4/totalNm : 0 };
   }
-  w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, MOTOR_KN, NOGO };
+
+  function offsetMarks(waypoints, twd, nm) {
+    if (!waypoints || waypoints.length < 2) return null;
+    const a = waypoints[0], b = waypoints[waypoints.length - 1];
+    const dist = CMGGeo.haversineNm(a, b);
+    if (dist < 1) return null;
+    const mid = CMGGeo.destPoint(a, CMGGeo.initialBearing(a, b), dist / 2);
+    const rhumb = CMGGeo.initialBearing(a, b);
+    const left = CMGGeo.wrap360(rhumb - 90);
+    const right = CMGGeo.wrap360(rhumb + 90);
+    const wind = CMGGeo.wrap360(twd || 0);
+    const dLeft = Math.abs(CMGGeo.angleDiff(left, wind));
+    const dRight = Math.abs(CMGGeo.angleDiff(right, wind));
+    const windwardBrg = dLeft <= dRight ? left : right;
+    const leewardBrg = dLeft <= dRight ? right : left;
+    const step = nm || 8;
+    return {
+      windward: Object.assign({ name: "Windward 8 nm" }, CMGGeo.destPoint(mid, windwardBrg, step)),
+      leeward: Object.assign({ name: "Leeward 8 nm" }, CMGGeo.destPoint(mid, leewardBrg, step)),
+      mid: mid
+    };
+  }
+  w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, offsetMarks, MOTOR_KN, NOGO };
 })(window);
