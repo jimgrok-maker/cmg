@@ -3,10 +3,10 @@
   const TRACK_STORE = "cmg.track.v1";
   const state = {
     lakeId: "erie", windSource: "hrrr", boatId: "mac26x", genericLwl: 23,
-    magnetic: false, hybrid: false, motorKn: 4, plan: "sail", tws: 10, twd: 270,
+    magnetic: false, hybrid: false, offset: false, motorKn: 4, plan: "sail", tws: 10, twd: 270,
     windPack: null, windField: null, departMs: Date.now(), waypoints: [], lakeRing: null, islands: [], route: null, outline: null
   };
-  let map, routeLayer, wpLayer, islandLayer, windLayer, poiLayer;
+  let map, routeLayer, offsetLayer, wpLayer, islandLayer, windLayer, poiLayer;
   let lastFix = null, boatMark = null, gpsWatch = null, trackLine = null;
   let gpsTrack = [];
   let fieldBusy = false, refreshTimer = null, movingSince = null, lastSogKn = null;
@@ -399,6 +399,51 @@
       return { points: points, wps: state.waypoints.slice() };
     };
   }
+
+  function fmtPlan(rt) {
+    if (!rt || !isFinite(rt.tHours)) return "\u2014";
+    return fmtHrs(rt.tHours);
+  }
+  function drawOffset(main) {
+    const line = document.getElementById("offsetLine");
+    if (offsetLayer) offsetLayer.clearLayers();
+    if (!state.offset || !main || state.waypoints.length < 2) {
+      if (line) line.textContent = "";
+      return;
+    }
+    const marks = CMGRoute.offsetMarks(state.waypoints, state.twd, 8);
+    if (!marks) { if (line) line.textContent = ""; return; }
+    const start = state.waypoints[0], end = state.waypoints[state.waypoints.length - 1];
+    function alt(mark) {
+      return CMGRoute.buildRoute([start, mark, end], boat(), state.tws, state.twd, state.lakeRing, state.islands, state.hybrid, windAtHours, state.motorKn, state.plan);
+    }
+    const wind = alt(marks.windward), lee = alt(marks.leeward);
+    function paint(rt, color, name) {
+      if (!rt) return;
+      rt.segs.forEach(function (s) {
+        L.polyline([[s.from.lat, s.from.lon], [s.to.lat, s.to.lon]], { color: color, weight: 2, dashArray: "2 6", opacity: 0.8 })
+          .addTo(offsetLayer);
+      });
+      const mid = rt.segs[Math.floor(rt.segs.length / 2)];
+      if (mid) {
+        L.marker([(mid.from.lat + mid.to.lat) / 2, (mid.from.lon + mid.to.lon) / 2], {
+          icon: L.divIcon({ className: "wind-mark", html: '<div class="wind-lab">' + name + " " + fmtPlan(rt) + "</div>", iconSize: [92, 22], iconAnchor: [46, 11] }),
+          interactive: false, keyboard: false
+        }).addTo(offsetLayer);
+      }
+    }
+    paint(wind, "#7eb6d9", "windward");
+    paint(lee, "#d98a7e", "leeward");
+    L.circleMarker([marks.windward.lat, marks.windward.lon], { radius: 5, color: "#7eb6d9", weight: 2, fillOpacity: 0.3 }).addTo(offsetLayer);
+    L.circleMarker([marks.leeward.lat, marks.leeward.lon], { radius: 5, color: "#d98a7e", weight: 2, fillOpacity: 0.3 }).addTo(offsetLayer);
+    if (line) {
+      const best = [ { n: "rhumb", h: main.tHours }, { n: "windward", h: wind.tHours }, { n: "leeward", h: lee.tHours } ]
+        .filter(function (x) { return isFinite(x.h); })
+        .sort(function (p, q) { return p.h - q.h; })[0];
+      line.textContent = "Rhumb " + fmtPlan(main) + " \u00b7 windward " + fmtPlan(wind) + " \u00b7 leeward " + fmtPlan(lee) +
+        (best ? " \u00b7 shorter is " + best.n : "");
+    }
+  }
   function compute(skipRefine) {
     const out = document.getElementById("stats");
     if (!map || state.waypoints.length < 2) {
@@ -412,6 +457,7 @@
     }
     const rt = CMGRoute.buildRoute(state.waypoints, boat(), state.tws, state.twd, state.lakeRing, state.islands, state.hybrid, windAtHours, state.motorKn, state.plan);
     state.route = rt; publishRoute(rt); drawRoute(rt); drawWindArrows(rt);
+    drawOffset(rt);
     const sailed = (rt.sailNm || 0) + (rt.motorNm || 0);
     const avg = (isFinite(rt.tHours) && rt.tHours > 0) ? (sailed / rt.tHours) : 0;
     setHud(avg ? avg.toFixed(1) : "\u2014", fmtHrs(rt.tHours));
@@ -493,6 +539,7 @@
     islandLayer = L.layerGroup().addTo(map);
     poiLayer = L.layerGroup().addTo(map);
     routeLayer = L.layerGroup().addTo(map);
+    offsetLayer = L.layerGroup().addTo(map);
     wpLayer = L.layerGroup().addTo(map);
     windLayer = L.layerGroup().addTo(map);
     ensureTrackLine();
@@ -561,6 +608,7 @@
     document.getElementById("tws").oninput = function (e) { state.tws = Number(e.target.value); compute(true); };
     document.getElementById("twd").oninput = function (e) { state.twd = Number(e.target.value); compute(true); };
     document.getElementById("hybrid").onchange = function (e) { state.hybrid = e.target.checked; compute(true); };
+    document.getElementById("offset").onchange = function (e) { state.offset = e.target.checked; compute(true); };
     document.getElementById("clearWp").onclick = function () { state.waypoints = []; state.windField = null; drawWaypoints(); renderWpList(); compute(); };
     document.getElementById("clearTrack").onclick = clearTrack;
     document.getElementById("tws").value = state.tws;
