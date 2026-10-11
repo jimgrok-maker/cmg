@@ -512,7 +512,7 @@
       if (field && field.field && field.field.length) state.windField = field.field;
       if (cached) {
         state.windPack = cached;
-        const now = CMGWind.atTime(cached, Date.now());
+        const now = CMGWind.atTime(cached, clockMs());
         if (now) { state.tws = now.tws; state.twd = now.twd; }
         const age = cached.fetchedAt ? ((Date.now() - cached.fetchedAt) / 3600000).toFixed(1) + "h stale" : "cached";
         el.textContent = "Offline " + state.tws.toFixed(0) + " kn FROM " + Math.round(state.twd) + "\u00b0 \u00b7 " + age;
