@@ -1,6 +1,7 @@
 (function () {
   const STORE = "cmg.v1";
   const TRACK_STORE = "cmg.track.v1";
+  const STALE_FIELD_HOURS = 4;
   const state = {
     lakeId: "erie", windSource: "hrrr", boatId: "mac26x", genericLwl: 23,
     magnetic: false, hybrid: false, offset: false, motorKn: 4, plan: "sail", tws: 10, twd: 270,
@@ -516,6 +517,9 @@
         if (now) { state.tws = now.tws; state.twd = now.twd; }
         const age = cached.fetchedAt ? ((Date.now() - cached.fetchedAt) / 3600000).toFixed(1) + "h stale" : "cached";
         el.textContent = "Offline " + state.tws.toFixed(0) + " kn FROM " + Math.round(state.twd) + "\u00b0 \u00b7 " + age;
+        if (cached.fetchedAt && (Date.now() - cached.fetchedAt) / 3600000 > STALE_FIELD_HOURS) {
+          el.textContent += " \u00b7 STALE \u2014 too old to trust, refresh when a connection is back";
+        }
         const extra = windAgeText();
         if (extra) el.textContent += " \u00b7 " + extra;
         el.textContent += " \u00b7 " + buildStamp();
@@ -560,9 +564,20 @@
   }
   function restoreField() {
     const saved = CMGWind.loadField && CMGWind.loadField();
-    if (saved && saved.field && saved.field.length) state.windField = saved.field;
+    if (saved && saved.field && saved.field.length) {
+      state.windField = saved.field;
+      const age = saved.savedAt ? (Date.now() - saved.savedAt) / 3600000 : null;
+      if (age != null && age > STALE_FIELD_HOURS && state.windSource !== "manual") {
+        // Don't silently trust a many-hours-old field: refresh first so a
+        // live fetch replaces it, falling back to the (stale) cache on failure.
+        refreshWind();
+      }
+    }
     const cached = CMGWind.loadCache();
     if (cached) state.windPack = cached;
+  }
+  function stopRefreshTimer() {
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
   }
   function startRefreshTimer() {
     if (refreshTimer) clearInterval(refreshTimer);
@@ -604,7 +619,17 @@
       bindSetup();
     };
     document.getElementById("genericLwl").onchange = function (e) { state.genericLwl = Number(e.target.value) || 23; bindSetup(); };
-    document.getElementById("windSource").onchange = function (e) { state.windSource = e.target.value; state.windField = null; };
+    document.getElementById("windSource").onchange = function (e) {
+      state.windSource = e.target.value;
+      state.windField = null;
+      if (state.windSource === "manual") {
+        stopRefreshTimer();
+        compute();
+      } else {
+        startRefreshTimer();
+        refreshWind();
+      }
+    };
     document.getElementById("mag").onchange = function (e) { state.magnetic = e.target.checked; compute(); };
     document.getElementById("motorKn").onchange = function (e) { state.motorKn = Number(e.target.value) || 4; save(); compute(); };
     document.getElementById("plan").onchange = function (e) { state.plan = e.target.value === "fast" ? "fast" : "sail"; save(); compute(); };
