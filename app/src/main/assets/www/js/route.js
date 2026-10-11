@@ -1,4 +1,3 @@
-(function (w) {
   const NOGO = 45;
   const MOTOR_KN = 4;
   function twaForCourse(twd, course) {
@@ -123,7 +122,7 @@
     const hours = bsp > 0.15 ? dist / bsp : (mode === "nogo" ? (fast ? dist / mkn : 0) : Infinity);
     const motorOffered = toward < 2 || mode === "nogo";
     const land = !segmentWet(a, b, lakeRing, islands);
-    return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, color: colorForTwa(twa), twd: twd, tws: tws };
+    return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, motorKn: mkn, color: colorForTwa(twa), twd: twd, tws: tws };
   }
   function splitByHour(a, b, cls, lakeRing, islands, hybrid, startHours, windAtFn, fallback, motorKn, plan) {
     const mkn = (motorKn >= 2 && motorKn <= 8) ? motorKn : MOTOR_KN;
@@ -138,7 +137,7 @@
       const twd = w.twd != null ? w.twd : fallback.twd;
       const ev = evaluateSegment(cursor, b, cls, tws, twd, lakeRing, islands, mkn, plan);
       if ((fast && ev.mode !== "nogo" && ev.bsp < mkn) || (hybrid && ev.motorOffered)) {
-        ev.mode = "motor"; ev.bsp = mkn; ev.hours = ev.dist / mkn; ev.color = "#6b8ea8"; ev.toward = mkn;
+        ev.mode = "motor"; ev.bsp = mkn; ev.hours = ev.dist / mkn; ev.color = "#6b8ea8"; ev.toward = mkn; ev.motorKn = mkn;
       }
       if (!isFinite(ev.hours) || ev.hours <= 1.05 || ev.dist < 0.12 || ev.mode === "nogo") {
         ev.startH = acc;
@@ -150,7 +149,7 @@
       const mid = { lat: cursor.lat + (b.lat - cursor.lat) * frac, lon: cursor.lon + (b.lon - cursor.lon) * frac };
       const piece = evaluateSegment(cursor, mid, cls, tws, twd, lakeRing, islands, mkn, plan);
       if ((fast && piece.mode !== "nogo" && piece.bsp < mkn) || (hybrid && piece.motorOffered)) {
-        piece.mode = "motor"; piece.bsp = mkn; piece.hours = piece.dist / mkn; piece.color = "#6b8ea8"; piece.toward = mkn;
+        piece.mode = "motor"; piece.bsp = mkn; piece.hours = piece.dist / mkn; piece.color = "#6b8ea8"; piece.toward = mkn; piece.motorKn = mkn;
       }
       piece.startH = acc;
       out.push(piece);
@@ -216,8 +215,8 @@
     const leewardBrg = dLeft <= dRight ? right : left;
     const step = nm || 8;
     return {
-      windward: Object.assign({ name: "Windward 8 nm" }, CMGGeo.destPoint(mid, windwardBrg, step)),
-      leeward: Object.assign({ name: "Leeward 8 nm" }, CMGGeo.destPoint(mid, leewardBrg, step)),
+      windward: Object.assign({ name: "Windward " + step + " nm" }, CMGGeo.destPoint(mid, windwardBrg, step)),
+      leeward: Object.assign({ name: "Leeward " + step + " nm" }, CMGGeo.destPoint(mid, leewardBrg, step)),
       mid: mid
     };
   }

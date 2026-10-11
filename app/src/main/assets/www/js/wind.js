@@ -1,7 +1,7 @@
 (function (w) {
   // Build stamp: shown in the wind label so a sideloaded APK can be told
   // apart from older ones without opening DevTools.
-  const BUILD = "0.3.6";
+  const BUILD = "0.3.18";
   const KEY = "cmg.wind.cache";
   const FIELD_KEY = "cmg.wind.field";
   function modelParam(source) {
@@ -102,7 +102,7 @@
     return null;
   }
   function loadCache() {
-    try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+    try { const raw = JSON.parse(localStorage.getItem(KEY)); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
   function ageHours(packOrField) {
     const t = packOrField && (packOrField.fetchedAt || packOrField.savedAt);

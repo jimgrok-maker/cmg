@@ -59,7 +59,8 @@
     return Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m";
   }
   function fmtCrs(trueDeg) {
-    const d = state.magnetic ? CMGGeo.wrap360(trueDeg + lake().variationW) : trueDeg;
+    const varW = (isFinite(lake().variationW) && lake().variationW > 0) ? lake().variationW : 0;
+    const d = state.magnetic ? CMGGeo.wrap360(trueDeg + varW) : trueDeg;
     return String(Math.round(d)).padStart(3, "0") + "\u00b0" + (state.magnetic ? "M" : "T");
   }
   function clockMs() { return state.departMs || Date.now(); }
@@ -176,7 +177,8 @@
     document.getElementById("mag").checked = state.magnetic;
     const mk = document.getElementById("motorKn"); if (mk) mk.value = String(state.motorKn || 4);
     const pl = document.getElementById("plan"); if (pl) pl.value = state.plan || "sail";
-    document.getElementById("varLabel").textContent = "Var " + lake().variationW.toFixed(1) + "\u00b0W";
+    const v = lake().variationW;
+    document.getElementById("varLabel").textContent = (isFinite(v) && v > 0) ? "Var " + v.toFixed(1) + "\u00b0W" : "Var unknown";
     document.getElementById("setupTitle").textContent = lake().name;
     document.getElementById("headerSub").textContent = lake().name;
     const b = boat();
@@ -244,7 +246,7 @@
       L.polyline([[s.from.lat, s.from.lon], [s.to.lat, s.to.lon]], { color:s.color, weight:(s.land||s.mode==="nogo")?3:5, dashArray:(s.land||s.mode==="nogo")?"8 7":null, opacity:0.95 })
         .addTo(routeLayer).bindTooltip(
           fmtCrs(s.course) + " \u00b7 " + s.dist.toFixed(2) + " nm \u00b7 TWA " + Math.round(s.twa) + "\u00b0 \u00b7 " +
-          (s.mode==="motor" ? "motor 4 kn" : s.bsp.toFixed(1)+" kn") +
+          (s.mode==="motor" ? "motor " + (s.motorKn || CMGRoute.MOTOR_KN) + " kn" : s.bsp.toFixed(1)+" kn") +
           (s.twd != null ? " \u00b7 wind FROM " + String(Math.round(s.twd)).padStart(3,"0") + "\u00b0" : "")
         );
     });
@@ -388,7 +390,7 @@
   }
   function publishRoute(rt) {
     window.CMGGetRoute = function () {
-      if (!rt || !rt.points || rt.points.length < 2) return null;
+      if (!rt || !rt.points || !rt.points.length) return null;
       const points = rt.points.map(function (p) {
         if (p.name) return { lat: p.lat, lon: p.lon, name: p.name };
         const hit = state.waypoints.find(function (w) {
