@@ -18,6 +18,12 @@ android {
         debug { isMinifyEnabled = false }
         release {
             isMinifyEnabled = false
+            // Intentional: only debug APKs are shipped, via the Build APK
+            // Actions artifact (assembleDebug). The release buildType borrows the
+            // debug signing config so a release assemble never fails on a
+            // missing release keystore. If you ever ship a signed release,
+            // replace this with a real release signingConfig (keystore via
+            // gradle.properties or CI secrets) and stop relying on debug.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

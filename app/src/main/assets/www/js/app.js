@@ -413,7 +413,7 @@
       if (line) line.textContent = "";
       return;
     }
-    const marks = CMGRoute.offsetMarks(state.waypoints, state.twd, 8);
+    const marks = CMGRoute.offsetMarks(state.waypoints, state.twd, CMGRoute.OFFSET_NM);
     if (!marks) { if (line) line.textContent = ""; return; }
     const start = state.waypoints[0], end = state.waypoints[state.waypoints.length - 1];
     function alt(mark) {
@@ -474,7 +474,8 @@
     if (rt.landHit) warn.push("A leg crosses land or an island \u2014 add a waypoint.");
     if (rt.nogoHit && (rt.nogoNm||0) >= 0.2) {
       if (state.plan === "fast") warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, cannot sail. " + fmtHrs(rt.nogoNm / state.motorKn) + " motor at " + state.motorKn + " kn is included in the P50.");
-      else warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, left out of the P50. Tack, or switch the plan to fastest.");
+      else if (!isFinite(rt.tHours)) warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, left out of the P50. Tack, or switch the plan to fastest.");
+      else warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, left out of the P50, so the P50 is optimistic. Tack, or switch the plan to fastest.");
     }
     if (rt.motorUsed) warn.push("VMG < 2 kn on a leg; motor at " + state.motorKn + " kn used in hybrid compare.");
     const rw = document.getElementById("routeWarn");
@@ -511,7 +512,7 @@
       if (field && field.field && field.field.length) state.windField = field.field;
       if (cached) {
         state.windPack = cached;
-        const now = CMGWind.atTime(cached, clockMs());
+        const now = CMGWind.atTime(cached, Date.now());
         if (now) { state.tws = now.tws; state.twd = now.twd; }
         const age = cached.fetchedAt ? ((Date.now() - cached.fetchedAt) / 3600000).toFixed(1) + "h stale" : "cached";
         el.textContent = "Offline " + state.tws.toFixed(0) + " kn FROM " + Math.round(state.twd) + "\u00b0 \u00b7 " + age;

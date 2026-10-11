@@ -1,6 +1,7 @@
 (function (w) {
   const NOGO = 45;
   const MOTOR_KN = 4;
+  const OFFSET_NM = 8;
   function twaForCourse(twd, course) {
     let twa = CMGGeo.wrap360(course - twd);
     if (twa > 180) twa -= 360;
@@ -214,6 +215,9 @@
     return { points: expanded, segs, tHours, totalNm, sailNm, motorNm, nogoNm, motorUsed, landHit, nogoHit, pctVmg2: totalNm ? 100*vmg2/totalNm : 0, pctVmg4: totalNm ? 100*vmg4/totalNm : 0 };
   }
 
+  // Default offset-mark distance. Single source of truth: app.js drawOffset()
+  // calls offsetMarks() with this value, and the "Offset N nm" checkbox label
+  // in index.html must read the same N.
   function offsetMarks(waypoints, twd, nm) {
     if (!waypoints || waypoints.length < 2) return null;
     const a = waypoints[0], b = waypoints[waypoints.length - 1];
@@ -228,12 +232,12 @@
     const dRight = Math.abs(CMGGeo.angleDiff(right, wind));
     const windwardBrg = dLeft <= dRight ? left : right;
     const leewardBrg = dLeft <= dRight ? right : left;
-    const step = nm || 8;
+    const step = nm || OFFSET_NM;
     return {
       windward: Object.assign({ name: "Windward " + step + " nm" }, CMGGeo.destPoint(mid, windwardBrg, step)),
       leeward: Object.assign({ name: "Leeward " + step + " nm" }, CMGGeo.destPoint(mid, leewardBrg, step)),
       mid: mid
     };
   }
-  w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, offsetMarks, MOTOR_KN, NOGO };
+  w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, offsetMarks, MOTOR_KN, NOGO, OFFSET_NM };
 })(window);
