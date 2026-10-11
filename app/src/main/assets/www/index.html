@@ -112,7 +112,7 @@
         <h3>Where does the wind come from?</h3>
         <p>Open-Meteo HRRR (~3 km cells, hourly). After the first route, CMG samples up to 12 cells along the track (~every 8 nm) and times each cell to when you are predicted to be there.</p>
         <h3>No cell signal</h3>
-        <p>The last center forecast and the last 12-cell field are saved on the phone. Offline, CMG keeps using them and marks the age. A refresh runs every 60 minutes when a fetch works.</p>
+        <p>The last center forecast and the last 12-cell field are saved on the phone. Offline, CMG keeps using them and shows the age. A refresh runs every 60 minutes and re-arms when you switch back to a live source (HRRR / GFS / ECMWF). If the cached data is older than about 4 hours it is flagged STALE so you are not quietly trusting old wind for the P50 — get a connection to refresh it.</p>
         <h3>P50 / P90</h3>
         <p>P50 is polar time in the forecast we have. P90 is that time × 1.22 — lulls, slop, and a forecast that was 20° off. Not a second model. A sail-only no-go leg is drawn dashed and left out of the P50. The clock is the solid line only.</p>
         <h3>SOG vs polar</h3>

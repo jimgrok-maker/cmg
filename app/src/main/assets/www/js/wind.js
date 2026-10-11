@@ -1,7 +1,7 @@
 (function (w) {
   // Build stamp: shown in the wind label so a sideloaded APK can be told
   // apart from older ones without opening DevTools.
-  const BUILD = "0.3.18";
+  const BUILD = "0.3.19";
   const KEY = "cmg.wind.cache";
   const FIELD_KEY = "cmg.wind.field";
   function modelParam(source) {
