@@ -38,7 +38,8 @@
     cat22: { id:"cat22", name:"Catalina 22", loa:21.5, lwl:19.33, draft:5.0, phrf:273, notes:"Working sails.", upwind:1.00, reach:0.98, run:0.98 },
     cat30: { id:"cat30", name:"Catalina 30", loa:29.92, lwl:25.0, draft:5.25, phrf:192, notes:"Working sails.", upwind:1.02, reach:1.00, run:1.00 },
     hun34: { id:"hun34", name:"Hunter 34", loa:34.42, lwl:28.21, draft:5.5, phrf:150, notes:"Working sails.", upwind:1.04, reach:1.02, run:1.00 },
-    s280: { id:"s280", name:"S2 8.0", loa:26.0, lwl:21.5, draft:4.0, phrf:228, notes:"S2 8.0 / S2 26. Working sails.", upwind:0.98, reach:0.99, run:0.98 }
+    s280: { id:"s280", name:"S2 8.0", loa:26.0, lwl:21.5, draft:4.0, phrf:228, notes:"S2 8.0 / S2 26. Working sails.", upwind:0.98, reach:0.99, run:0.98 },
+    potter19: { id:"potter19", name:"West Wight Potter 19", loa:18.75, lwl:16.75, draft:3.58, phrf:288, notes:"Board down. Working sails. Pocket cruiser.", upwind:0.96, reach:0.97, run:0.95 }
   };
   function classFactor(cls, twa) {
     const a = Math.abs(twa);
