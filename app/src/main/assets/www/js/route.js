@@ -1,3 +1,4 @@
+(function (w) {
   const NOGO = 45;
   const MOTOR_KN = 4;
   function twaForCourse(twd, course) {
@@ -124,6 +125,17 @@
     const land = !segmentWet(a, b, lakeRing, islands);
     return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, motorKn: mkn, color: colorForTwa(twa), twd: twd, tws: tws };
   }
+  // Promote a leg to motor when the engine would finish it sooner than the
+  // sail speed (fast plan) or whenever a motor is offered (hybrid compare).
+  function applyMotor(ev, mkn, fast, hybrid) {
+    if ((fast && ev.mode !== "nogo" && ev.bsp < mkn) || (hybrid && ev.motorOffered)) {
+      ev.mode = "motor"; ev.bsp = mkn; ev.hours = ev.dist / mkn; ev.color = "#6b8ea8"; ev.toward = mkn; ev.motorKn = mkn;
+    }
+    return ev;
+  }
+  // Walk a leg hour by hour, evaluating each sub-piece at the forecast wind
+  // for the time you are predicted to be there. Capped at maxPieces so a very
+  // long leg can't explode the segment count.
   function splitByHour(a, b, cls, lakeRing, islands, hybrid, startHours, windAtFn, fallback, motorKn, plan) {
     const mkn = (motorKn >= 2 && motorKn <= 8) ? motorKn : MOTOR_KN;
     const fast = plan === "fast";
@@ -131,26 +143,29 @@
     let cursor = a;
     let acc = isFinite(startHours) ? startHours : 0;
     let guard = 0;
+    let maxPieces = 1;
     while (guard++ < 48) {
       const w = windAtFn ? (windAtFn(acc, cursor) || fallback) : fallback;
       const tws = w.tws != null ? w.tws : fallback.tws;
       const twd = w.twd != null ? w.twd : fallback.twd;
-      const ev = evaluateSegment(cursor, b, cls, tws, twd, lakeRing, islands, mkn, plan);
-      if ((fast && ev.mode !== "nogo" && ev.bsp < mkn) || (hybrid && ev.motorOffered)) {
-        ev.mode = "motor"; ev.bsp = mkn; ev.hours = ev.dist / mkn; ev.color = "#6b8ea8"; ev.toward = mkn; ev.motorKn = mkn;
-      }
-      if (!isFinite(ev.hours) || ev.hours <= 1.05 || ev.dist < 0.12 || ev.mode === "nogo") {
+      const ev = applyMotor(evaluateSegment(cursor, b, cls, tws, twd, lakeRing, islands, mkn, plan), mkn, fast, hybrid);
+      if (!isFinite(ev.hours) || ev.dist < 0.12 || ev.mode === "nogo") {
         ev.startH = acc;
         out.push(ev);
         acc += (isFinite(ev.hours) && ev.hours > 0) ? ev.hours : 0;
         break;
       }
-      const frac = 1 / ev.hours;
-      const mid = { lat: cursor.lat + (b.lat - cursor.lat) * frac, lon: cursor.lon + (b.lon - cursor.lon) * frac };
-      const piece = evaluateSegment(cursor, mid, cls, tws, twd, lakeRing, islands, mkn, plan);
-      if ((fast && piece.mode !== "nogo" && piece.bsp < mkn) || (hybrid && piece.motorOffered)) {
-        piece.mode = "motor"; piece.bsp = mkn; piece.hours = piece.dist / mkn; piece.color = "#6b8ea8"; piece.toward = mkn; piece.motorKn = mkn;
+      if (ev.hours <= 1.05 || out.length + 1 >= maxPieces) {
+        ev.startH = acc;
+        out.push(ev);
+        acc += ev.hours;
+        break;
       }
+      maxPieces = Math.floor(ev.hours - 0.05);
+      if (maxPieces < 2) maxPieces = 2;
+      const cut = Math.min(1 / ev.hours, (maxPieces - 1) / out.length);
+      const mid = { lat: cursor.lat + (b.lat - cursor.lat) * cut, lon: cursor.lon + (b.lon - cursor.lon) * cut };
+      const piece = applyMotor(evaluateSegment(cursor, mid, cls, tws, twd, lakeRing, islands, mkn, plan), mkn, fast, hybrid);
       piece.startH = acc;
       out.push(piece);
       acc += (isFinite(piece.hours) && piece.hours > 0) ? piece.hours : 0;
