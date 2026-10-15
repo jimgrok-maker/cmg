@@ -24,6 +24,7 @@ import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends Activity {
+    private static final String APP_HOST = "appassets.androidplatform.net";
     private WebView webView;
 
     public class CmBridge {
@@ -33,9 +34,9 @@ public class MainActivity extends Activity {
                 if (text == null || text.isEmpty()) return "empty route";
                 String safe = filename == null ? "cmg-route.gpx" : filename.replaceAll("[^A-Za-z0-9._-]", "_");
                 File f = new File(getCacheDir(), safe);
-                FileOutputStream out = new FileOutputStream(f);
-                out.write(text.getBytes(StandardCharsets.UTF_8));
-                out.close();
+                try (FileOutputStream out = new FileOutputStream(f)) {
+                    out.write(text.getBytes(StandardCharsets.UTF_8));
+                }
                 Uri uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".files", f);
                 Intent send = new Intent(Intent.ACTION_SEND);
                 send.setType("application/gpx+xml");
@@ -73,6 +74,21 @@ public class MainActivity extends Activity {
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 return assetLoader.shouldInterceptRequest(request.getUrl());
             }
+
+            // Only the bundled app may load in this WebView (it has the
+            // CMGNative bridge). Any other link (e.g. Leaflet / OSM
+            // attribution) opens in the user's browser instead.
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri url = request.getUrl();
+                if (APP_HOST.equals(url.getHost())) return false;
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, url));
+                } catch (Exception ignored) {
+                    // No browser available: just stay on the app page.
+                }
+                return true;
+            }
         });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -88,7 +104,37 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(false);
 
         webView.addJavascriptInterface(new CmBridge(), "CMGNative");
-        webView.loadUrl("https://appassets.androidplatform.net/assets/www/index.html");
+        webView.loadUrl("https://" + APP_HOST + "/assets/www/index.html");
+    }
+
+    // Pause JS timers, GPS watch and rendering while the app is in the
+    // background; resume them when it comes back.
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (webView != null) {
+            webView.onPause();
+            webView.pauseTimers();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.resumeTimers();
+            webView.onResume();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (webView != null) {
+            webView.removeJavascriptInterface("CMGNative");
+            webView.destroy();
+            webView = null;
+        }
+        super.onDestroy();
     }
 
     private boolean locationGranted() {
