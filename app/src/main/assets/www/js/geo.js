@@ -33,9 +33,41 @@
     return d > 180 ? 360 - d : d;
   }
   function wrap360(d) { return (d % 360 + 360) % 360; }
-  function pointInRing(lon, lat, ring) {
-    let inside = false;
+  // Rings can have thousands of vertices (the Erie shoreline does), so each
+  // ring gets a cached bounding box plus latitude-band edge index the first
+  // time it is tested. Results are identical to the plain even-odd test.
+  const BANDS = 128;
+  const ringIndex = typeof WeakMap === "function" ? new WeakMap() : null;
+  function indexFor(ring) {
+    let ix = ringIndex && ringIndex.get(ring);
+    if (ix) return ix;
+    let minLon = 1e9, maxLon = -1e9, minLat = 1e9, maxLat = -1e9;
+    for (let i = 0; i < ring.length; i++) {
+      const x = ring[i][0], y = ring[i][1];
+      if (x < minLon) minLon = x; if (x > maxLon) maxLon = x;
+      if (y < minLat) minLat = y; if (y > maxLat) maxLat = y;
+    }
+    const h = (maxLat - minLat) / BANDS || 1e-9;
+    const bands = [];
+    for (let b = 0; b < BANDS; b++) bands.push([]);
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const y0 = Math.min(ring[i][1], ring[j][1]), y1 = Math.max(ring[i][1], ring[j][1]);
+      const b0 = Math.max(0, Math.floor((y0 - minLat) / h)), b1 = Math.min(BANDS - 1, Math.floor((y1 - minLat) / h));
+      for (let b = b0; b <= b1; b++) bands[b].push(i);
+    }
+    ix = { minLon, maxLon, minLat, maxLat, h, bands };
+    if (ringIndex) ringIndex.set(ring, ix);
+    return ix;
+  }
+  function pointInRing(lon, lat, ring) {
+    if (!ring || ring.length < 3 || !isFinite(lon) || !isFinite(lat)) return false;
+    const ix = indexFor(ring);
+    if (lon < ix.minLon || lon > ix.maxLon || lat < ix.minLat || lat > ix.maxLat) return false;
+    const band = ix.bands[Math.min(BANDS - 1, Math.floor((lat - ix.minLat) / ix.h))];
+    let inside = false;
+    const n = ring.length;
+    for (let k = 0; k < band.length; k++) {
+      const i = band[k], j = i === 0 ? n - 1 : i - 1;
       const xi = ring[i][0], yi = ring[i][1];
       const xj = ring[j][0], yj = ring[j][1];
       const hit = ((yi > lat) !== (yj > lat)) &&
@@ -44,8 +76,12 @@
     }
     return inside;
   }
-  const DOCK_NM = 0.35;
-  const DOCK_EXIT_NM = 2.4;
+  // Only the listed mark itself counts as a dock (a wider radius let tack and
+  // detour points that happened to be near a harbor sit on land).
+  const DOCK_NM = 0.02;
+  // Listed marks now sit in the water just off their harbors, so only a short
+  // allowance remains for a mark that is right against a seawall.
+  const DOCK_EXIT_NM = 0.2;
   let docks = [];
   function setDocks(list) {
     docks = (list || []).map(function (d) { return { lat: d.lat, lon: d.lon, name: d.name }; });
@@ -70,7 +106,9 @@
   }
   function onWater(pt, lakeRing, islands) {
     if (!inLake(pt, lakeRing)) return false;
-    if (isDock(pt)) return true;
+    // (A point near a listed mark is no longer treated as water automatically:
+    // marks sit in the water now, and that shortcut let tack/detour points
+    // land on islands.)
     if (islandAt(pt, islands)) return false;
     return true;
   }
@@ -93,7 +131,7 @@
     if (!startDock && !onWater(a, lakeRing, islands)) return false;
     if (!endDock && !onWater(b, lakeRing, islands)) return false;
     const dist = haversineNm(a, b);
-    const samples = samplesOnSegment(a, b, Math.max(8, Math.ceil(dist * 14)));
+    const samples = samplesOnSegment(a, b, Math.max(8, Math.ceil(dist * 30)));
     let leftStart = !startIsl;
     for (let i = 0; i < samples.length; i++) {
       const s = samples[i];

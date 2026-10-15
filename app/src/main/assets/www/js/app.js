@@ -10,7 +10,8 @@
   let map, routeLayer, offsetLayer, wpLayer, islandLayer, windLayer, poiLayer;
   let lastFix = null, boatMark = null, gpsWatch = null, trackLine = null;
   let gpsTrack = [];
-  let fieldBusy = false, refreshTimer = null, movingSince = null, lastSogKn = null;
+  let fieldBusy = false, fieldPending = false, refreshTimer = null, movingSince = null, lastSogKn = null;
+  let windGap = false;
 
   function buildStamp() {
     const v = (window.CMGWind && window.CMGWind.BUILD) || "?";
@@ -23,13 +24,17 @@
   function poisHere() { return (window.CMG_POIS || []).filter(function (p) { return p.lake === state.lakeId; }); }
   function islandsHere() { return state.lakeId === "erie" ? (window.CMG_ISLANDS || []) : []; }
   function boat() {
-    return state.boatId === "generic" ? CMGPolars.genericClass(state.genericLwl) : CMGPolars.CLASSES[state.boatId];
+    if (state.boatId === "generic") return CMGPolars.genericClass(state.genericLwl);
+    // A saved boat id that no longer exists (renamed/removed class) must not
+    // break startup: fall back to the default class.
+    return CMGPolars.CLASSES[state.boatId] || CMGPolars.CLASSES.mac26x || CMGPolars.genericClass(state.genericLwl);
   }
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
         lakeId: state.lakeId, boatId: state.boatId, genericLwl: state.genericLwl,
-        windSource: state.windSource, magnetic: state.magnetic, motorKn: state.motorKn, plan: state.plan
+        windSource: state.windSource, magnetic: state.magnetic, motorKn: state.motorKn, plan: state.plan,
+        waypoints: state.waypoints.map(function (w) { return { lat: w.lat, lon: w.lon, name: w.name }; })
       }));
     } catch (e) {}
   }
@@ -43,6 +48,14 @@
       if (typeof p.magnetic === "boolean") state.magnetic = p.magnetic;
       if (p.motorKn >= 2 && p.motorKn <= 8) state.motorKn = p.motorKn;
       if (p.plan === "fast" || p.plan === "sail") state.plan = p.plan;
+      if (p.boatId && p.boatId !== "generic" && !CMGPolars.CLASSES[p.boatId]) state.boatId = "mac26x";
+      if (Array.isArray(p.waypoints)) {
+        state.waypoints = p.waypoints.filter(function (w) {
+          return w && isFinite(w.lat) && isFinite(w.lon) && Math.abs(w.lat) <= 90 && Math.abs(w.lon) <= 180;
+        }).slice(0, 100).map(function (w, i) {
+          return { lat: Number(w.lat), lon: Number(w.lon), name: typeof w.name === "string" ? w.name.slice(0, 60) : "Mark " + (i + 1) };
+        });
+      }
     } catch (e) {}
   }
   function loadTrack() {
@@ -220,6 +233,7 @@
   function addWp(pt) {
     state.waypoints.push({ lat: pt.lat, lon: pt.lon, name: pt.name || ("Mark " + (state.waypoints.length + 1)) });
     state.windField = null;
+    save();
     drawWaypoints(); renderWpList(); compute();
   }
   function drawWaypoints() {
@@ -233,9 +247,9 @@
     const box = document.getElementById("wps"); box.innerHTML = "";
     state.waypoints.forEach(function (w, i) {
       const d = document.createElement("div"); d.className = "wp";
-      d.innerHTML = "<span>" + (i+1) + " \u00b7 " + w.name + "</span>";
+      const sp = document.createElement("span"); sp.textContent = (i+1) + " \u00b7 " + w.name; d.appendChild(sp);
       const rm = document.createElement("button"); rm.className = "ghost"; rm.textContent = "remove";
-      rm.onclick = function () { state.waypoints.splice(i, 1); state.windField = null; drawWaypoints(); renderWpList(); compute(); };
+      rm.onclick = function () { state.waypoints.splice(i, 1); state.windField = null; save(); drawWaypoints(); renderWpList(); compute(); };
       d.appendChild(rm); box.appendChild(d);
     });
   }
@@ -262,6 +276,9 @@
       const w = CMGWind.atTime(state.windPack, when);
       if (w && w.twd != null) return { tws: w.tws, twd: w.twd, gust: w.gust, clock: w.time };
     }
+    // A live source with no forecast hour near this time (beyond the model
+    // horizon, or only null hours): fall back to the TWS/TWD fields, and say so.
+    if (state.windSource !== "manual") windGap = true;
     return { tws: state.tws, twd: state.twd, gust: null, clock: null };
   }
   function sampleRoutePoints(rt) {
@@ -302,22 +319,33 @@
     const d = lastSogKn - polar;
     el.textContent = "SOG " + lastSogKn.toFixed(1) + " vs polar " + polar.toFixed(1) + " \u00b7 " + (d >= 0 ? "+" : "") + d.toFixed(1) + " kn";
   }
+  function fieldKey() {
+    return state.windSource + "|" + state.lakeId + "|" + state.waypoints.map(function (w) { return w.lat.toFixed(5) + "," + w.lon.toFixed(5); }).join(";");
+  }
   async function refineWindField(rt) {
-    if (fieldBusy || state.windSource === "manual" || !rt) return;
+    if (state.windSource === "manual" || !rt) return;
+    if (fieldBusy) { fieldPending = true; return; }
     const pts = sampleRoutePoints(rt);
     if (pts.length < 2) return;
-    fieldBusy = true;
+    fieldBusy = true; fieldPending = false;
+    const key = fieldKey();
     const el = document.getElementById("windLabel");
     if (el) el.textContent = setWindLine(el.textContent, "sampling " + pts.length + " cells\u2026");
     try {
       const field = await CMGWind.fetchMany(pts, state.windSource, lake().tz);
-      if (field && field.length) {
+      // Marks, lake or source changed while this was in flight: the field
+      // belongs to an old route, so drop it.
+      if (key !== fieldKey()) { fieldPending = true; }
+      else if (field && field.length) {
         state.windField = field;
         compute(true);
         if (el) el.textContent = setWindLine(el.textContent, field.length + " cells along track");
+      } else if (el) {
+        el.textContent = setWindLine(el.textContent, "no forecast cells along track");
       }
     } catch (e) {}
     fieldBusy = false;
+    if (fieldPending) { fieldPending = false; compute(); }
   }
   function windBarbSvg(rotDeg) {
     return '<div class="wind-vec"><svg viewBox="0 0 32 32" style="transform:rotate(' + rotDeg + 'deg)">' +
@@ -414,7 +442,8 @@
       if (line) line.textContent = "";
       return;
     }
-    const marks = CMGRoute.offsetMarks(state.waypoints, state.twd, CMGRoute.OFFSET_NM);
+    const w0 = windAtHours(0, state.waypoints[0]);
+    const marks = CMGRoute.offsetMarks(state.waypoints, w0.twd, CMGRoute.OFFSET_NM);
     if (!marks) { if (line) line.textContent = ""; return; }
     const start = state.waypoints[0], end = state.waypoints[state.waypoints.length - 1];
     function alt(mark) {
@@ -458,6 +487,7 @@
       setHud("\u2014", "\u2014");
       return;
     }
+    windGap = false;
     const rt = CMGRoute.buildRoute(state.waypoints, boat(), state.tws, state.twd, state.lakeRing, state.islands, state.hybrid, windAtHours, state.motorKn, state.plan);
     state.route = rt; publishRoute(rt); drawRoute(rt); drawWindArrows(rt);
     drawOffset(rt);
@@ -475,9 +505,10 @@
     if (rt.landHit) warn.push("A leg crosses land or an island \u2014 add a waypoint.");
     if (rt.nogoHit && (rt.nogoNm||0) >= 0.2) {
       if (state.plan === "fast") warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, cannot sail. " + fmtHrs(rt.nogoNm / state.motorKn) + " motor at " + state.motorKn + " kn is included in the P50.");
-      else if (!isFinite(rt.tHours)) warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, left out of the P50. Tack, or switch the plan to fastest.");
-      else warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed, left out of the P50, so the P50 is optimistic. Tack, or switch the plan to fastest.");
+      else warn.push("No-go on " + rt.nogoNm.toFixed(1) + " nm \u2014 dashed (no clear tacks found). Timed in the P50 as if tacked at the best upwind angle; add marks to plan the tacks.");
     }
+    if (!isFinite(rt.tHours)) warn.push("No ETA: wind under 2 kn on a leg (drifting). Turn on hybrid or the fastest plan to motor it.");
+    if (windGap) warn.push("No " + state.windSource.toUpperCase() + " forecast for part of this trip (beyond the model horizon or missing hours) \u2014 those legs use the TWS/TWD fields.");
     if (rt.motorUsed) warn.push("VMG < 2 kn on a leg; motor at " + state.motorKn + " kn used in hybrid compare.");
     const rw = document.getElementById("routeWarn");
     rw.innerHTML = warn.join(" "); rw.classList.toggle("hidden", warn.length === 0);
@@ -506,6 +537,8 @@
         el.textContent = src.toUpperCase() + " " + sample.tws.toFixed(0) + " kn FROM " +
           String(Math.round(sample.twd)).padStart(3,"0") + "\u00b0 " + leave + " @ " + (sample.time || "").slice(11,16) +
           " \u00b7 " + buildStamp();
+      } else {
+        el.textContent = src.toUpperCase() + " has no forecast near the departure time \u2014 using TWS/TWD fields \u00b7 " + buildStamp();
       }
     } catch (e) {
       const cached = CMGWind.loadCache();
@@ -557,6 +590,7 @@
     if (!id) return;
     state.lakeId = id;
     state.waypoints = []; state.route = null; state.windField = null;
+    save();
     if (routeLayer) routeLayer.clearLayers();
     if (windLayer) windLayer.clearLayers();
     drawWaypoints(); renderWpList(); setHud("\u2014", "\u2014"); bindSetup();
@@ -590,7 +624,7 @@
     showSetup(false);
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
-        initMap(); applyLake(); resizeMap(); startGps(); restoreField(); startRefreshTimer(); refreshWind();
+        initMap(); applyLake(); resizeMap(); drawWaypoints(); renderWpList(); startGps(); restoreField(); startRefreshTimer(); refreshWind();
       });
     });
   }
@@ -637,7 +671,7 @@
     document.getElementById("twd").oninput = function (e) { state.twd = Number(e.target.value); compute(true); };
     document.getElementById("hybrid").onchange = function (e) { state.hybrid = e.target.checked; compute(true); };
     document.getElementById("offset").onchange = function (e) { state.offset = e.target.checked; compute(true); };
-    document.getElementById("clearWp").onclick = function () { state.waypoints = []; state.windField = null; drawWaypoints(); renderWpList(); compute(); };
+    document.getElementById("clearWp").onclick = function () { state.waypoints = []; state.windField = null; save(); drawWaypoints(); renderWpList(); compute(); };
     document.getElementById("clearTrack").onclick = clearTrack;
     document.getElementById("tws").value = state.tws;
     document.getElementById("twd").value = state.twd;

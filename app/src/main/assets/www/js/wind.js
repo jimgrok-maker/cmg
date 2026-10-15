@@ -1,13 +1,13 @@
 (function (w) {
   // Build stamp: shown in the wind label so a sideloaded APK can be told
   // apart from older ones without opening DevTools.
-  const BUILD = "0.3.19";
+  const BUILD = "0.3.21"; // keep in sync with versionName in app/build.gradle.kts (checked by tests)
   const KEY = "cmg.wind.cache";
   const FIELD_KEY = "cmg.wind.field";
   function modelParam(source) {
     if (source === "hrrr") return "gfs_hrrr";
     if (source === "gfs") return "gfs_seamless";
-    if (source === "ecmwf") return "ecmwf_ifs04";
+    if (source === "ecmwf") return "ecmwf_ifs025";
     return "gfs_hrrr";
   }
   function packFrom(data, source, tz, lat, lon) {
@@ -43,6 +43,9 @@
     if (!res.ok) throw new Error("Wind fetch failed " + res.status);
     const data = await res.json();
     const pack = packFrom(Array.isArray(data) ? data[0] : data, source, tz, lat, lon);
+    // A model that returns only nulls (e.g. a retired model id) is a failure,
+    // not a forecast: don't overwrite a good cache with it.
+    if (!hasData(pack)) throw new Error("Forecast has no wind data for " + source);
     try { localStorage.setItem(KEY, JSON.stringify(pack)); } catch (e) {}
     return pack;
   }
@@ -69,7 +72,7 @@
           if (lon0 == null) lon0 = pts[i].lon;
           if (!isFinite(lat0) || !isFinite(lon0)) return;
           const pk = packFrom(d, source, tz, lat0, lon0);
-          if (!isFinite(pk.lat) || !isFinite(pk.lon)) return;
+          if (!isFinite(pk.lat) || !isFinite(pk.lon) || !hasData(pk)) return;
           slots[i] = pk;
         });
       }
@@ -102,7 +105,7 @@
     return null;
   }
   function loadCache() {
-    try { const raw = JSON.parse(localStorage.getItem(KEY)); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+    try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
   function ageHours(packOrField) {
     const t = packOrField && (packOrField.fetchedAt || packOrField.savedAt);
@@ -130,28 +133,44 @@
     utc = utcGuess - tzOffsetMs(utc, tz);
     return utc;
   }
+  // A forecast hour further than this from the requested time is treated as
+  // "no forecast" (departure beyond the model horizon, or only null hours).
+  const MAX_GAP_H = 1.5;
+  function num(v) { return typeof v === "number" && isFinite(v); }
+  // Nearest forecast hour that actually has wind. Null hours (models return
+  // null past their horizon) are skipped. Returns null when nothing usable is
+  // within MAX_GAP_H, and { outOfRange: true } callers can report via lastGap.
   function atTime(pack, whenMs) {
     if (!pack || !pack.hourly || !pack.hourly.time || !pack.hourly.time.length) return null;
     const times = pack.hourly.time;
     const tz = pack.tz || "America/New_York";
+    const tws = pack.hourly.tws || [], twd = pack.hourly.twd || [], gust = pack.hourly.gust || [], code = pack.hourly.code || [];
     let best = -1, bestD = 1e18;
     for (let i = 0; i < times.length; i++) {
+      if (!num(tws[i]) || !num(twd[i])) continue;
       const t = parsePackTime(times[i], tz);
       if (!isFinite(t)) continue;
       const d = Math.abs(t - whenMs);
       if (d < bestD) { bestD = d; best = i; }
     }
-    if (best < 0) return null;
-    const tws = pack.hourly.tws[best];
-    const twd = pack.hourly.twd[best];
-    if (!isFinite(tws) || !isFinite(twd)) return null;
-    const gust = pack.hourly.gust[best];
+    if (best < 0 || bestD / 3600000 > MAX_GAP_H) return null;
     return {
-      tws: tws, twd: twd,
-      gust: isFinite(gust) ? gust : null,
-      code: pack.hourly.code[best],
+      tws: tws[best], twd: twd[best],
+      gust: num(gust[best]) ? gust[best] : null,
+      code: code[best],
       time: times[best], ageH: bestD / 3600000
     };
+  }
+  // True when the pack has usable wind somewhere but not near whenMs.
+  function outOfRange(pack, whenMs) {
+    if (!pack || !pack.hourly || !pack.hourly.time || !pack.hourly.time.length) return false;
+    return atTime(pack, whenMs) == null;
+  }
+  function hasData(pack) {
+    if (!pack || !pack.hourly) return false;
+    const tws = pack.hourly.tws || [], twd = pack.hourly.twd || [];
+    for (let i = 0; i < tws.length; i++) if (num(tws[i]) && num(twd[i])) return true;
+    return false;
   }
   function nearestPack(field, lat, lon) {
     if (!field || !field.length) return null;
@@ -167,5 +186,5 @@
     const pack = nearestPack(field, lat, lon);
     return pack ? atTime(pack, whenMs) : null;
   }
-  w.CMGWind = { BUILD: BUILD, fetchForecast, fetchMany, loadCache, loadField, saveField, ageHours, atTime, atPlace, nearestPack };
+  w.CMGWind = { BUILD: BUILD, MAX_GAP_H, modelParam, parsePackTime, fetchForecast, fetchMany, loadCache, loadField, saveField, ageHours, atTime, outOfRange, hasData, atPlace, nearestPack };
 })(window);
