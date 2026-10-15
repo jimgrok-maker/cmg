@@ -1,20 +1,18 @@
 (function (w) {
   const TWA_SHAPE = [[32,0.36],[38,0.56],[45,0.74],[52,0.84],[60,0.88],[70,0.90],[80,0.90],[90,0.94],[100,0.96],[110,0.96],[120,0.94],[135,0.92],[150,0.90],[165,0.88],[180,0.86]];
   function hullSpeed(lwlFt) { return 1.34 * Math.sqrt(Math.max(8, lwlFt)); }
+  // Speed multiplier vs true wind speed. Zero below 2 kn (drifting: no
+  // honest sailing ETA), then interpolated from 0 at 2 kn so there is no jump.
+  const WS_KNOTS = [2,4,6,8,10,12,14,16,18,20,22];
+  const WS_SCALE = [0,0.38,0.55,0.70,0.84,0.96,1.04,1.08,1.10,1.08,1.02];
   function windScale(tws, twa) {
-    let s;
-    if (tws <= 3) s = 0.22;
-    else if (tws >= 22) s = 1.02;
-    else {
-      const knots = [4,6,8,10,12,14,16,18,20,22];
-      const sc = [0.38,0.55,0.70,0.84,0.96,1.04,1.08,1.10,1.08,1.02];
-      s = 1;
-      for (let i = 1; i < knots.length; i++) {
-        if (tws <= knots[i]) {
-          const t = (tws - knots[i-1]) / (knots[i] - knots[i-1]);
-          s = sc[i-1] + t * (sc[i] - sc[i-1]);
-          break;
-        }
+    if (!isFinite(tws) || tws <= WS_KNOTS[0]) return 0;
+    let s = WS_SCALE[WS_SCALE.length - 1];
+    for (let i = 1; i < WS_KNOTS.length; i++) {
+      if (tws <= WS_KNOTS[i]) {
+        const t = (tws - WS_KNOTS[i-1]) / (WS_KNOTS[i] - WS_KNOTS[i-1]);
+        s = WS_SCALE[i-1] + t * (WS_SCALE[i] - WS_SCALE[i-1]);
+        break;
       }
     }
     const a = Math.abs(twa || 0);
@@ -23,6 +21,7 @@
     return s;
   }
   function shapeAt(twa) {
+    if (!isFinite(twa)) return 0;
     const a = Math.min(180, Math.abs(twa));
     if (a < TWA_SHAPE[0][0]) return TWA_SHAPE[0][1] * (a / TWA_SHAPE[0][0]);
     for (let i = 1; i < TWA_SHAPE.length; i++) {
@@ -64,5 +63,5 @@
     const lwl = Number(lwlFt) || 23;
     return { id:"generic", name:"Generic " + lwl.toFixed(1) + " ft LWL", loa:lwl, lwl, draft:null, phrf:null, notes:"Hull speed " + hullSpeed(lwl).toFixed(2) + " kn", upwind:1, reach:1, run:1 };
   }
-  w.CMGPolars = { hullSpeed, CLASSES, boatSpeed, vmgToWind, bestUpwindTwa, genericClass, shapeAt, TWA_SHAPE };
+  w.CMGPolars = { windScale, hullSpeed, CLASSES, boatSpeed, vmgToWind, bestUpwindTwa, genericClass, shapeAt, TWA_SHAPE };
 })(window);
