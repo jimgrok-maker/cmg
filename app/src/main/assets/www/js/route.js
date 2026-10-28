@@ -28,88 +28,154 @@
     return { minLon: minLon, maxLon: maxLon, minLat: minLat, maxLat: maxLat,
       cLon: (minLon + maxLon) / 2, cLat: (minLat + maxLat) / 2 };
   }
-  function islandHits(a, b, islands) {
-    const hits = [];
-    (islands || []).forEach(function (isl) {
-      const dist = CMGGeo.haversineNm(a, b);
-      const samples = CMGGeo.samplesOnSegment(a, b, Math.max(8, Math.ceil(dist * 14)));
-      const crossed = samples.some(function (s) { return CMGGeo.pointInRing(s.lon, s.lat, isl.ring); });
-      if (crossed) hits.push(isl);
-    });
-    return hits;
-  }
+  // Rounding marks around an island: bbox corners and edge midpoints at two
+  // clearances (~0.25 nm and ~0.8 nm).
   function candidatesFor(isl) {
     const b = ringBounds(isl.ring);
-    const dLat = 0.014;
-    const dLon = 0.018;
-    return [
-      { lat: b.maxLat + dLat, lon: b.cLon },
-      { lat: b.minLat - dLat, lon: b.cLon },
-      { lat: b.cLat, lon: b.maxLon + dLon },
-      { lat: b.cLat, lon: b.minLon - dLon },
-      { lat: b.maxLat + dLat, lon: b.maxLon + dLon },
-      { lat: b.maxLat + dLat, lon: b.minLon - dLon },
-      { lat: b.minLat - dLat, lon: b.maxLon + dLon },
-      { lat: b.minLat - dLat, lon: b.minLon - dLon }
-    ];
+    const out = [];
+    [[0.0042, 0.0056], [0.014, 0.018]].forEach(function (m) {
+      const dLat = m[0], dLon = m[1];
+      out.push(
+        { lat: b.maxLat + dLat, lon: b.cLon }, { lat: b.minLat - dLat, lon: b.cLon },
+        { lat: b.cLat, lon: b.maxLon + dLon }, { lat: b.cLat, lon: b.minLon - dLon },
+        { lat: b.maxLat + dLat, lon: b.maxLon + dLon }, { lat: b.maxLat + dLat, lon: b.minLon - dLon },
+        { lat: b.minLat - dLat, lon: b.maxLon + dLon }, { lat: b.minLat - dLat, lon: b.minLon - dLon });
+    });
+    return out;
   }
+  // Shortest wet path from -> to through island rounding marks (A* over a
+  // lazily-checked visibility graph). Only islands near the leg are used.
+  // Returns the intermediate points, or [] when the leg is already wet or no
+  // wet path was found (the leg is then drawn and flagged as crossing land).
   function detourAround(from, to, lakeRing, islands) {
     if (segmentWet(from, to, lakeRing, islands)) return [];
-    const hits = islandHits(from, to, islands);
-    const list = hits.length ? hits : (islands || []);
-    let bestPts = null, bestLen = 1e9;
-    list.forEach(function (isl) {
-      const cands = candidatesFor(isl).filter(function (p) {
-        return CMGGeo.onWater(p, lakeRing, islands);
-      });
-      cands.forEach(function (p) {
-        if (!segmentWet(from, p, lakeRing, islands) || !segmentWet(p, to, lakeRing, islands)) return;
-        const len = CMGGeo.haversineNm(from, p) + CMGGeo.haversineNm(p, to);
-        if (len < bestLen) { bestLen = len; bestPts = [p]; }
-      });
-      for (let i = 0; i < cands.length; i++) {
-        for (let j = 0; j < cands.length; j++) {
-          if (i === j) continue;
-          const p1 = cands[i], p2 = cands[j];
-          if (!segmentWet(from, p1, lakeRing, islands)) continue;
-          if (!segmentWet(p1, p2, lakeRing, islands)) continue;
-          if (!segmentWet(p2, to, lakeRing, islands)) continue;
-          const len = CMGGeo.haversineNm(from, p1) + CMGGeo.haversineNm(p1, p2) + CMGGeo.haversineNm(p2, to);
-          if (len < bestLen) { bestLen = len; bestPts = [p1, p2]; }
-        }
-      }
+    if (!CMGGeo.onWater(from, lakeRing, islands) || !CMGGeo.onWater(to, lakeRing, islands)) return [];
+    const pad = 0.12;
+    const minLat = Math.min(from.lat, to.lat) - pad, maxLat = Math.max(from.lat, to.lat) + pad;
+    const minLon = Math.min(from.lon, to.lon) - pad * 1.35, maxLon = Math.max(from.lon, to.lon) + pad * 1.35;
+    const nodes = [from, to];
+    (islands || []).forEach(function (isl) {
+      const b = ringBounds(isl.ring);
+      if (b.maxLat < minLat || b.minLat > maxLat || b.maxLon < minLon || b.minLon > maxLon) return;
+      if (b.maxLat - b.minLat < 0.003 && b.maxLon - b.minLon < 0.004) return; // islets: bigger islands' marks clear them
+      candidatesFor(isl).forEach(function (p) { if (CMGGeo.onWater(p, lakeRing, islands)) nodes.push(p); });
     });
-    return bestPts || [];
-  }
-  function estimateTackPoint(from, to, firstCourse, secondCourse, dist, lakeRing, islands) {
-    const step = Math.max(0.12, dist / 36);
-    let best = null, bestErr = 1e9;
-    for (let d = step; d < dist * 1.8; d += step) {
-      const p = CMGGeo.destPoint(from, firstCourse, d);
-      if (!CMGGeo.onWater(p, lakeRing, islands)) continue;
-      if (!segmentWet(from, p, lakeRing, islands)) continue;
-      if (!segmentWet(p, to, lakeRing, islands)) continue;
-      const err = CMGGeo.angleDiff(CMGGeo.initialBearing(p, to), secondCourse);
-      if (err < bestErr) { bestErr = err; best = p; }
-      if (err < 3) break;
+    // Lazy A*: a node's edge from its best parent is only checked for water
+    // when the node is popped. A dry edge is remembered and the node is
+    // re-parented to its next-best closed neighbour (no check yet), so each
+    // pop costs one water check.
+    const n = nodes.length;
+    const g = new Array(n).fill(Infinity), prev = new Array(n).fill(-1), done = new Array(n).fill(false);
+    const hs = nodes.map(function (p) { return CMGGeo.haversineNm(p, to); });
+    const dist = function (i, j) { return CMGGeo.haversineNm(nodes[i], nodes[j]); };
+    const bad = {};
+    const closed = [0];
+    g[0] = 0; done[0] = true;
+    for (let v = 1; v < n; v++) { g[v] = dist(0, v); prev[v] = 0; }
+    function reparent(u) {
+      g[u] = Infinity; prev[u] = -1;
+      for (let k = 0; k < closed.length; k++) {
+        const c = closed[k];
+        if (bad[c + ":" + u]) continue;
+        const d = g[c] + dist(c, u);
+        if (d < g[u]) { g[u] = d; prev[u] = c; }
+      }
     }
-    if (!best || bestErr > 22) return null;
-    return best;
+    for (let checks = 0; checks < 3000; checks++) {
+      let u = -1, best = Infinity;
+      for (let i = 0; i < n; i++) if (!done[i] && g[i] + hs[i] < best) { best = g[i] + hs[i]; u = i; }
+      if (u < 0) break;
+      if (!segmentWet(nodes[prev[u]], nodes[u], lakeRing, islands)) {
+        bad[prev[u] + ":" + u] = true;
+        reparent(u);
+        continue;
+      }
+      done[u] = true; closed.push(u);
+      if (u === 1) break;
+      for (let v = 0; v < n; v++) {
+        if (done[v] || bad[u + ":" + v]) continue;
+        const cand = g[u] + dist(u, v);
+        if (cand < g[v]) { g[v] = cand; prev[v] = u; }
+      }
+    }
+    if (!done[1] || prev[1] < 0) return [];
+    const pts = [];
+    for (let v = prev[1]; v > 0; v = prev[v]) pts.unshift(nodes[v]);
+    return pts;
   }
-  function beatToMark(from, to, cls, tws, twd, lakeRing, islands) {
+  // Exact tack point: the intersection of the first-tack line from `from` and
+  // the second-tack line into `to`, solved in a local flat frame (fine at
+  // lake scale). Returns { s, t } leg lengths in nm, or null if the lines do
+  // not meet ahead of both points.
+  function tackLegs(from, to, h1, h2) {
+    const k = Math.cos(CMGGeo.toRad((from.lat + to.lat) / 2));
+    const dx = (to.lon - from.lon) * 60 * k, dy = (to.lat - from.lat) * 60;
+    const u1 = [Math.sin(CMGGeo.toRad(h1)), Math.cos(CMGGeo.toRad(h1))];
+    const u2 = [Math.sin(CMGGeo.toRad(h2)), Math.cos(CMGGeo.toRad(h2))];
+    const det = u1[0] * u2[1] - u1[1] * u2[0];
+    if (Math.abs(det) < 1e-9) return null;
+    const s = (dx * u2[1] - dy * u2[0]) / det;
+    const t = (u1[0] * dy - u1[1] * dx) / det;
+    if (s < -1e-9 || t < -1e-9) return null;
+    return { s: Math.max(0, s), t: Math.max(0, t) };
+  }
+  // Zig-zag of n tack pairs (2n legs) that stays on the exact laylines.
+  function zigzag(from, to, h1, h2, legs, n) {
+    const pts = [];
+    let cur = from;
+    for (let i = 0; i < n; i++) {
+      const p1 = CMGGeo.destPoint(cur, h1, legs.s / n);
+      pts.push(p1);
+      if (i === n - 1) break;
+      cur = CMGGeo.destPoint(p1, h2, legs.t / n);
+      pts.push(cur);
+    }
+    return pts;
+  }
+  function pathWet(from, pts, to, lakeRing, islands) {
+    const all = [from].concat(pts, [to]);
+    for (let i = 0; i < all.length - 1; i++) if (!segmentWet(all[i], all[i + 1], lakeRing, islands)) return false;
+    return true;
+  }
+  // Tack points for a leg that lies inside the no-go cone of wind w. Tries
+  // the exact single tack on each board first, then more, shorter tacks;
+  // if the boards still hit land, splits the leg along the (wet) rhumb line
+  // and tacks each half (multi-tack fallback). Returns null if nothing fits.
+  function beatToMark(from, to, cls, w, lakeRing, islands, depth) {
+    depth = depth || 0;
     const destBrg = CMGGeo.initialBearing(from, to);
-    if (Math.abs(twaForCourse(twd, destBrg)) >= NOGO) return null;
-    const opt = CMGPolars.bestUpwindTwa(cls, tws);
-    const stbd = CMGGeo.wrap360(twd + opt);
-    const port = CMGGeo.wrap360(twd - opt);
-    const dist = CMGGeo.haversineNm(from, to);
-    const stbdFirst = estimateTackPoint(from, to, stbd, port, dist, lakeRing, islands);
-    const portFirst = estimateTackPoint(from, to, port, stbd, dist, lakeRing, islands);
-    if (!stbdFirst && !portFirst) return null;
-    if (stbdFirst && !portFirst) return [stbdFirst];
-    if (portFirst && !stbdFirst) return [portFirst];
+    if (Math.abs(twaForCourse(w.twd, destBrg)) >= NOGO) return [];
+    const opt = Math.max(NOGO + 1, CMGPolars.bestUpwindTwa(cls, w.tws));
+    const stbd = CMGGeo.wrap360(w.twd + opt);
+    const port = CMGGeo.wrap360(w.twd - opt);
     const preferStbd = CMGGeo.angleDiff(stbd, destBrg) <= CMGGeo.angleDiff(port, destBrg);
-    return [preferStbd ? stbdFirst : portFirst];
+    const orders = preferStbd ? [[stbd, port], [port, stbd]] : [[port, stbd], [stbd, port]];
+    for (let n = 1; n <= 4; n++) {
+      for (let o = 0; o < orders.length; o++) {
+        const legs = tackLegs(from, to, orders[o][0], orders[o][1]);
+        if (!legs) continue;
+        const pts = zigzag(from, to, orders[o][0], orders[o][1], legs, n);
+        if (pathWet(from, pts, to, lakeRing, islands)) return pts;
+      }
+    }
+    const dist = CMGGeo.haversineNm(from, to);
+    if (depth >= 4 || dist < 1) return null;
+    const mid = CMGGeo.destPoint(from, destBrg, dist / 2);
+    if (!CMGGeo.onWater(mid, lakeRing, islands)) return null;
+    const left = beatToMark(from, mid, cls, w, lakeRing, islands, depth + 1);
+    if (!left) return null;
+    const right = beatToMark(mid, to, cls, w, lakeRing, islands, depth + 1);
+    if (!right) return null;
+    // `mid` is only kept when a tack does not already turn there.
+    return left.concat([mid], right);
+  }
+  // Time to cover a no-go leg by tacking at the best upwind angle: sailed
+  // distance = dist * cos(offWind) / cos(opt).
+  function tackingHours(cls, tws, twa, dist) {
+    const opt = Math.max(NOGO + 1, CMGPolars.bestUpwindTwa(cls, tws));
+    const v = CMGPolars.boatSpeed(cls, tws, opt);
+    if (!(v > 0.15)) return Infinity;
+    return dist * Math.cos(CMGGeo.toRad(Math.abs(twa))) / Math.cos(CMGGeo.toRad(opt)) / v;
   }
   function evaluateSegment(a, b, cls, tws, twd, lakeRing, islands, motorKn, plan) {
     const mkn = (motorKn >= 2 && motorKn <= 8) ? motorKn : MOTOR_KN;
@@ -119,9 +185,16 @@
     const twa = twaForCourse(twd, course);
     let bsp = CMGPolars.boatSpeed(cls, tws, twa);
     let mode = "sail";
-    if (Math.abs(twa) < NOGO) { bsp = 0; mode = "nogo"; }
+    let hours;
+    if (Math.abs(twa) < NOGO) {
+      bsp = 0; mode = "nogo";
+      // A no-go leg is never free: fast plan motors it, sail plan is timed as
+      // if tacked at the best upwind angle.
+      hours = fast ? dist / mkn : tackingHours(cls, tws, twa, dist);
+    } else {
+      hours = dist < 1e-9 ? 0 : (bsp > 0.15 ? dist / bsp : Infinity);
+    }
     const toward = bsp;
-    const hours = bsp > 0.15 ? dist / bsp : (mode === "nogo" ? (fast ? dist / mkn : 0) : Infinity);
     const motorOffered = toward < 2 || mode === "nogo";
     const land = !segmentWet(a, b, lakeRing, islands);
     return { from:a, to:b, course, dist, twa, bsp, hours, toward, motorOffered, land, mode, motorKn: mkn, color: colorForTwa(twa), twd: twd, tws: tws };
@@ -134,9 +207,15 @@
     }
     return ev;
   }
-  // Walk a leg hour by hour, evaluating each sub-piece at the forecast wind
-  // for the time you are predicted to be there. Capped at maxPieces so a very
-  // long leg can't explode the segment count.
+  function windAt(windAtFn, fallback, hours, pt) {
+    const w = (windAtFn && windAtFn(hours, pt)) || fallback;
+    return {
+      tws: (w.tws != null && isFinite(w.tws)) ? w.tws : fallback.tws,
+      twd: (w.twd != null && isFinite(w.twd)) ? w.twd : fallback.twd
+    };
+  }
+  // Walk a leg hour by hour, evaluating each roughly one-hour piece at the
+  // forecast wind for the time you are predicted to be there (max 48 pieces).
   function splitByHour(a, b, cls, lakeRing, islands, hybrid, startHours, windAtFn, fallback, motorKn, plan) {
     const mkn = (motorKn >= 2 && motorKn <= 8) ? motorKn : MOTOR_KN;
     const fast = plan === "fast";
@@ -144,39 +223,30 @@
     let cursor = a;
     let acc = isFinite(startHours) ? startHours : 0;
     let guard = 0;
-    let maxPieces = 1;
     while (guard++ < 48) {
-      const w = windAtFn ? (windAtFn(acc, cursor) || fallback) : fallback;
-      const tws = w.tws != null ? w.tws : fallback.tws;
-      const twd = w.twd != null ? w.twd : fallback.twd;
-      const ev = applyMotor(evaluateSegment(cursor, b, cls, tws, twd, lakeRing, islands, mkn, plan), mkn, fast, hybrid);
-      if (!isFinite(ev.hours) || ev.dist < 0.12 || ev.mode === "nogo") {
+      const w = windAt(windAtFn, fallback, acc, cursor);
+      const ev = applyMotor(evaluateSegment(cursor, b, cls, w.tws, w.twd, lakeRing, islands, mkn, plan), mkn, fast, hybrid);
+      if (!isFinite(ev.hours) || ev.dist < 0.12 || ev.hours <= 1.05 || guard === 48) {
         ev.startH = acc;
         out.push(ev);
-        acc += (isFinite(ev.hours) && ev.hours > 0) ? ev.hours : 0;
+        acc += isFinite(ev.hours) ? ev.hours : 0;
+        if (!isFinite(ev.hours)) acc = Infinity;
         break;
       }
-      if (ev.hours <= 1.05 || out.length + 1 >= maxPieces) {
-        ev.startH = acc;
-        out.push(ev);
-        acc += ev.hours;
-        break;
-      }
-      maxPieces = Math.floor(ev.hours - 0.05);
-      if (maxPieces < 2) maxPieces = 2;
-      const cut = Math.min(1 / ev.hours, (maxPieces - 1) / out.length);
-      const mid = { lat: cursor.lat + (b.lat - cursor.lat) * cut, lon: cursor.lon + (b.lon - cursor.lon) * cut };
-      const piece = applyMotor(evaluateSegment(cursor, mid, cls, tws, twd, lakeRing, islands, mkn, plan), mkn, fast, hybrid);
+      // One hour's worth of this leg, along the great circle.
+      const mid = CMGGeo.destPoint(cursor, ev.course, ev.dist / ev.hours);
+      const piece = applyMotor(evaluateSegment(cursor, mid, cls, w.tws, w.twd, lakeRing, islands, mkn, plan), mkn, fast, hybrid);
       piece.startH = acc;
       out.push(piece);
-      acc += (isFinite(piece.hours) && piece.hours > 0) ? piece.hours : 0;
+      acc += piece.hours;
       cursor = mid;
     }
     return { segs: out, endHours: acc };
   }
   function buildRoute(waypoints, cls, tws, twd, lakeRing, islands, hybrid, windAtFn, motorKn, plan) {
     const fallback = { tws: tws, twd: twd };
-    const path = waypoints.slice();
+    const path = (waypoints || []).slice();
+    if (!path.length) return { points: [], segs: [], tHours: 0, totalNm: 0, sailNm: 0, motorNm: 0, nogoNm: 0, motorUsed: false, landHit: false, nogoHit: false, pctVmg2: 0, pctVmg4: 0 };
     const wet = [path[0]];
     for (let i = 0; i < path.length - 1; i++) {
       const a = wet[wet.length - 1], b = path[i + 1];
@@ -185,33 +255,41 @@
       });
       wet.push(b);
     }
+    // Legs are timed in order so each tack decision uses the forecast wind
+    // at the time and place that leg starts.
     const expanded = [wet[0]];
-    for (let i = 0; i < wet.length - 1; i++) {
-      const a = expanded[expanded.length - 1], b = wet[i + 1];
-      if (Math.abs(twaForCourse(twd, CMGGeo.initialBearing(a, b))) < NOGO) {
-        const extra = beatToMark(a, b, cls, tws, twd, lakeRing, islands);
-        if (extra) extra.forEach(function (p) { expanded.push(p); });
-      }
-      expanded.push(b);
-    }
     const segs = [];
     let tHours = 0, sailNm = 0, motorNm = 0, nogoNm = 0, motorUsed = false, landHit = false, nogoHit = false, vmg2 = 0, vmg4 = 0, totalNm = 0;
-    for (let i = 0; i < expanded.length - 1; i++) {
-      const part = splitByHour(expanded[i], expanded[i+1], cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback, motorKn, plan);
+    let tack = 0;
+    function runLeg(a, b) {
+      const part = splitByHour(a, b, cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback, motorKn, plan);
       part.segs.forEach(function (ev) {
         if (ev.mode === "motor") { motorUsed = true; motorNm += ev.dist; }
         else if (ev.mode === "nogo") { nogoHit = true; nogoNm += ev.dist; if (plan === "fast") motorNm += ev.dist; }
         else sailNm += ev.dist;
         if (ev.land) landHit = true;
-        if (isFinite(ev.hours) && ev.hours > 0) tHours += ev.hours;
         totalNm += ev.dist;
         if (ev.toward >= 2) vmg2 += ev.dist;
         if (ev.toward >= 4) vmg4 += ev.dist;
         segs.push(ev);
       });
-      if (isFinite(part.endHours)) tHours = Math.max(tHours, part.endHours);
+      tHours = isFinite(tHours) ? part.endHours : Infinity;
     }
-    if (tHours <= 0 && nogoHit && nogoNm >= totalNm * 0.5) tHours = Infinity;
+    for (let i = 0; i < wet.length - 1; i++) {
+      const a = expanded[expanded.length - 1], b = wet[i + 1];
+      const w = windAt(windAtFn, fallback, isFinite(tHours) ? tHours : 0, a);
+      let legPts = [];
+      if (Math.abs(twaForCourse(w.twd, CMGGeo.initialBearing(a, b))) < NOGO) {
+        legPts = beatToMark(a, b, cls, w, lakeRing, islands, 0) || [];
+      }
+      let cur = a;
+      legPts.forEach(function (p) {
+        const tp = { lat: p.lat, lon: p.lon, name: "Tack " + (++tack) };
+        runLeg(cur, tp); expanded.push(tp); cur = tp;
+      });
+      runLeg(cur, b);
+      expanded.push(b);
+    }
     return { points: expanded, segs, tHours, totalNm, sailNm, motorNm, nogoNm, motorUsed, landHit, nogoHit, pctVmg2: totalNm ? 100*vmg2/totalNm : 0, pctVmg4: totalNm ? 100*vmg4/totalNm : 0 };
   }
 
@@ -239,5 +317,5 @@
       mid: mid
     };
   }
-  w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, offsetMarks, MOTOR_KN, NOGO, OFFSET_NM };
+  w.CMGRoute = { twaForCourse, colorForTwa, buildRoute, offsetMarks, tackLegs, tackingHours, detourAround, MOTOR_KN, NOGO, OFFSET_NM };
 })(window);
