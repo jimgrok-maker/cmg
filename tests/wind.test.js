@@ -59,3 +59,24 @@ test("fetchMany back-fills points the batch call missed", async () => {
   const f = await ctx.CMGWind.fetchMany([{ lat: 41.5, lon: -82.7 }, { lat: 41.6, lon: -82.8 }, { lat: 41.7, lon: -82.9 }], "hrrr", tz);
   assert.equal(f.map((p) => p.lat).join(","), "41.5,41.6,41.7");
 });
+
+test("fieldNeedsRefresh: old or unknown-age route fields are rebuilt, fresh ones are not", () => {
+  const { ctx } = load();
+  const W = ctx.CMGWind, now = Date.now(), H = 3600000;
+  const cell = (ageH) => ({ lat: 41.5, lon: -82.7, fetchedAt: now - ageH * H });
+  assert.equal(W.fieldNeedsRefresh([cell(0.2), cell(0.3)], 0.9, now), false);
+  assert.equal(W.fieldNeedsRefresh([cell(0.2), cell(2)], 0.9, now), true, "oldest cell decides");
+  assert.equal(W.fieldNeedsRefresh([{ lat: 1, lon: 2 }], 0.9, now), true, "unknown age");
+  assert.equal(W.fieldNeedsRefresh(null, 0.9, now), false, "no field: compute builds one");
+  assert.ok(Math.abs(W.fieldAgeHours([cell(3), cell(1)], now) - 3) < 1e-9);
+});
+
+test("a failed fetchMany returns nothing and leaves the saved field untouched", async () => {
+  const { ctx, store } = load();
+  const saved = { savedAt: Date.now() - 5 * 3600000, field: [{ lat: 41.5, lon: -82.7, fetchedAt: Date.now() - 5 * 3600000, hourly: { time: [], tws: [], twd: [], gust: [], code: [] } }] };
+  store["cmg.wind.field"] = JSON.stringify(saved);
+  const out = await ctx.CMGWind.fetchMany([{ lat: 41.5, lon: -82.7 }, { lat: 41.6, lon: -82.8 }], "hrrr", tz);
+  assert.equal(out.length, 0);
+  assert.equal(JSON.parse(store["cmg.wind.field"]).savedAt, saved.savedAt);
+  assert.equal(ctx.CMGWind.loadField().field.length, 1);
+});

@@ -93,38 +93,54 @@
             <option value="fast">Maximize fastest time to destination</option>
           </select>
         </label>
-        <p class="disclaimer">Sailing leaves a dashed no-go out of the clock — tack around it. Fastest motors any leg the engine would finish sooner, including the dash, at the speed above.</p>
+        <p class="disclaimer">Sailing never motors; a leg inside the no-go angle is timed as if tacked. Fastest motors any leg the engine would finish sooner, including legs too close to the wind, at the speed above.</p>
         <label style="margin-top:0.4rem;flex-direction:row;align-items:center;gap:0.45rem;text-transform:none">
           <input type="checkbox" id="mag" /> Magnetic courses (<span id="varLabel">Var —</span>)
         </label>
-        <div class="chip">Check official NOAA / CHS chart for depths. CMG stays inside a coarse shoreline. Planning aid — not a chartplotter. Island routing is detailed on Erie first.</div>
+        <div class="chip">Planning aid, not a chartplotter. Check NOAA / CHS for depths. Lake Erie uses an OpenStreetMap shoreline and islands and routes around islands. Other waters use a rough outline with no island routing. Legs that cross land are flagged, not rerouted.</div>
         <button class="primary" id="openChart" style="width:100%;margin-top:0.4rem">Open chart</button>
       </div>
       <div id="faqPane" class="faq hidden">
         <h3>What is CMG?</h3>
-        <p>A trip planner with a live SOG and gold GPS track. Not a chartplotter. Always check NOAA / CHS for depths.</p>
+        <p>A trip planner with a live SOG and gold GPS track. Not a chartplotter. Always check NOAA / CHS for depths. CMG does not model currents, leeway, waves or depths.</p>
         <h3>Leave-at</h3>
-        <p>Default is now. Set a later departure and every gold tag and polar hour shifts to that clock. Use it for an overnight so dusk and dawn get the right HRRR hours.</p>
+        <p>Default is the time the app opened; tap Use now to reset it. Set a later departure and every wind hour and ETA shifts to that clock. HRRR only covers about two days, so use GFS or ECMWF for a later trip.</p>
         <h3>TWD FROM vs the arrow</h3>
-        <p>Numbers are meteorological FROM. Gold barbs point downwind. Gxx on a barb is gust knots at that hour.</p>
+        <p>Numbers are meteorological FROM. Arrows point where the wind blows. A barb label shows the FROM direction, plus G and gust knots when the forecast has them. One barb per hour (every 2 hours on trips over 10 hours).</p>
         <h3>Route colors</h3>
-        <p>Red is no-go, under 45°. Orange is pinched (45–55°). Yellow is tight (55–80°). Green is a reach (80–140°). Slate is deep (140–165°). Brown is a dead run (over 165°). Same yellow is no longer used for a run.</p>
+        <p>Red is no-go, under 45°. Orange is pinched (45–55°). Yellow is tight (55–80°). Green is a reach (80–140°). Slate is deep (140–165°). Brown is a dead run (over 165°). Blue is a leg CMG motors.</p>
         <h3>Where does the wind come from?</h3>
-        <p>Open-Meteo HRRR (~3 km cells, hourly). After the first route, CMG samples up to 12 cells along the track (~every 8 nm) and times each cell to when you are predicted to be there.</p>
+        <p>Open-Meteo forecasts: HRRR (default, ~3 km, hourly, about 2 days ahead), GFS (about 7 days) or ECMWF (0.25° ≈ 25 km, about 7 days), or Manual. After you place marks, CMG samples up to 12 points along the route and uses the nearest one for each leg at the time you are predicted to be there. Past a model's range CMG falls back to the TWS / TWD boxes and warns you.</p>
+        <h3>Typing your own wind</h3>
+        <p>With HRRR, GFS or ECMWF selected the forecast is used for every leg, and the TWS / TWD boxes are only a fallback (each refresh overwrites them). To plan your own wind, choose Manual.</p>
         <h3>No cell signal</h3>
-        <p>The last center forecast and the last 12-cell field are saved on the phone. Offline, CMG keeps using them and shows the age. A refresh runs every 60 minutes and re-arms when you switch back to a live source (HRRR / GFS / ECMWF). If the cached data is older than about 4 hours it is flagged STALE so you are not quietly trusting old wind for the P50 — get a connection to refresh it.</p>
+        <p>Your last forecast and the route's wind points are saved on the phone and used offline, with their age shown. A saved forecast older than about 4 hours is marked STALE. While online, CMG asks for a new forecast every 60 minutes and rebuilds the route's wind points when they are an hour old. If a refresh fails, the saved wind is kept and its age shown. Map tiles are not saved, so the map goes blank without a connection; marks, routes and outlines still work.</p>
         <h3>P50 / P90</h3>
-        <p>P50 is polar time in the forecast we have. P90 is that time × 1.22 — lulls, slop, and a forecast that was 20° off. Not a second model. CMG plans the tacks for a leg inside 45° of the wind. If no clear tacks fit, the leg is drawn dashed and timed as if tacked at the best upwind angle (the fastest plan motors it instead). Under 2 kn of wind there is no sailing ETA.</p>
+        <p>P50 is the planned time from the boat model and the forecast wind, including any motoring. P90 is simply P50 × 1.22, a rule-of-thumb allowance for lulls, slop and forecast error. It is not a statistical forecast.</p>
+        <h3>Tacking</h3>
+        <p>For a leg closer than 45° to the wind, CMG plans tacks at about 47° off the wind. If no tacks fit around land, the leg is drawn dashed and timed as if tacked (the fastest plan motors it).</p>
+        <h3>Calm wind</h3>
+        <p>Under 2 kn the boat does not move in the model. In the sail plan, one calm hour on a leg makes the whole ETA (P50 and P90) show —. Fastest and Hybrid motor those legs instead.</p>
+        <h3>Plans and motor</h3>
+        <p>Maximize sailing time never motors. Fastest motors any leg the engine would finish sooner, including legs too close to the wind. Hybrid compare (checkbox) motors legs where boat speed is under 2 kn and legs too close to the wind. Motor speed is the Setup value.</p>
+        <h3>Offset 8 nm</h3>
+        <p>The Offset checkbox compares your route with going via a mark 8 nm windward or 8 nm leeward of the middle of the route. It is a comparison, not a router.</p>
+        <h3>Boats</h3>
+        <p>Boat speeds come from a formula (waterline length, wind speed and angle, a per-boat factor, capped near hull speed), not measured polars. Listed: MacGregor 26X, Catalina 22, Catalina 30, Hunter 34, S2 8.0 and West Wight Potter 19, or Generic by waterline length.</p>
+        <h3>Magnetic courses</h3>
+        <p>The checkbox adds a fixed westerly variation for the lake (Erie 7.6°W) to the courses shown on legs. It has no year or drift. Wind directions always stay true.</p>
         <h3>SOG vs polar</h3>
-        <p>After about 20 minutes of GPS motion, CMG compares live SOG to the planned polar average.</p>
-        <h3>Motor policy</h3>
-        <p>Default is sail only. Hybrid compare motors at the setup speed when VMG is under 2 kn.</p>
+        <p>After about 20 minutes of GPS motion, CMG compares live SOG to the planned average speed.</p>
         <h3>Fence vs chart</h3>
-        <p>The thin line around a lake and dashed island hulls are a wet/dry test, not the shoreline. OSM under the map is the shore. GPS track ignores the fence.</p>
-        <h3>GPX</h3>
-        <p>Export GPX shares the planned route (marks plus any auto detour) to Files or OpenCPN. Planning stays in CMG; the last mile stays on a real chart.</p>
+        <p>The dashed lines are the shoreline and island outlines CMG uses as its water / land test. On Lake Erie they come from OpenStreetMap, simplified to about 90 m. Other waters use a rough outline. They are not a chart, depths are not included, and your GPS track ignores them.</p>
         <h3>Islands</h3>
-        <p>Erie has keep-off hulls for Pelee, Middle Island, Bass, Kelleys. Ohio inland lakes use a coarse reservoir outline only — add taps around coves.</p>
+        <p>Lake Erie is routed around its islands (islets under about 0.2 nm across are ignored). Every other lake and Chesapeake Bay uses a rough outline with no islands, so add taps around coves and islands yourself. A leg that still crosses land is flagged, not rerouted.</p>
+        <h3>GPX</h3>
+        <p>Export GPX sends the planned route (your marks, automatic detours around islands, and planned tack points) through the Android share sheet, for example to OpenCPN or Files. It is a route of positions only, with no times. Planning stays in CMG; the last mile stays on a real chart.</p>
+        <h3>Marks and GPS track</h3>
+        <p>Your marks are saved on the phone and come back when you reopen the app. The gold GPS track is saved too (last 4,000 points; Clear track erases it). CMG is not set up to record the track while it is in the background.</p>
+        <h3>Data sources</h3>
+        <p>Wind: Open-Meteo. Map tiles and the Lake Erie shoreline and islands: © OpenStreetMap contributors.</p>
       </div>
     </section>
     <div id="planner" class="hidden">

@@ -1,7 +1,7 @@
 (function (w) {
   // Build stamp: shown in the wind label so a sideloaded APK can be told
   // apart from older ones without opening DevTools.
-  const BUILD = "0.3.21"; // keep in sync with versionName in app/build.gradle.kts (checked by tests)
+  const BUILD = "0.3.22"; // keep in sync with versionName in app/build.gradle.kts (checked by tests)
   const KEY = "cmg.wind.cache";
   const FIELD_KEY = "cmg.wind.field";
   function modelParam(source) {
@@ -104,6 +104,24 @@
     } catch (e) {}
     return null;
   }
+  // Age in hours of the oldest cell in a saved route field (null if unknown).
+  function fieldAgeHours(field, now) {
+    if (!field || !field.length) return null;
+    let oldest = null;
+    for (let i = 0; i < field.length; i++) {
+      const t = field[i] && field[i].fetchedAt;
+      if (!t) return null;
+      if (oldest == null || t < oldest) oldest = t;
+    }
+    return ((now || Date.now()) - oldest) / 3600000;
+  }
+  // True when a route field exists but is at least maxAgeH old (or of unknown
+  // age) and should be rebuilt from the current route.
+  function fieldNeedsRefresh(field, maxAgeH, now) {
+    if (!field || !field.length) return false;
+    const age = fieldAgeHours(field, now);
+    return age == null || age >= maxAgeH;
+  }
   function loadCache() {
     try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
@@ -186,5 +204,5 @@
     const pack = nearestPack(field, lat, lon);
     return pack ? atTime(pack, whenMs) : null;
   }
-  w.CMGWind = { BUILD: BUILD, MAX_GAP_H, modelParam, parsePackTime, fetchForecast, fetchMany, loadCache, loadField, saveField, ageHours, atTime, outOfRange, hasData, atPlace, nearestPack };
+  w.CMGWind = { BUILD: BUILD, MAX_GAP_H, modelParam, parsePackTime, fetchForecast, fetchMany, loadCache, loadField, saveField, ageHours, fieldAgeHours, fieldNeedsRefresh, atTime, outOfRange, hasData, atPlace, nearestPack };
 })(window);
