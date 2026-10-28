@@ -2,6 +2,8 @@
   const STORE = "cmg.v1";
   const TRACK_STORE = "cmg.track.v1";
   const STALE_FIELD_HOURS = 4;
+  // Hourly refresh interval; a route wind field this old is rebuilt too.
+  const FIELD_REFRESH_HOURS = 1;
   const state = {
     lakeId: "erie", windSource: "hrrr", boatId: "mac26x", genericLwl: 23,
     magnetic: false, hybrid: false, offset: false, motorKn: 4, plan: "sail", tws: 10, twd: 270,
@@ -12,6 +14,7 @@
   let gpsTrack = [];
   let fieldBusy = false, fieldPending = false, refreshTimer = null, movingSince = null, lastSogKn = null;
   let windGap = false;
+  let fieldStale = false; // set after a good fetch when the route field is due for a rebuild
 
   function buildStamp() {
     const v = (window.CMGWind && window.CMGWind.BUILD) || "?";
@@ -91,10 +94,9 @@
   function windAgeText() {
     const bits = [];
     if (state.windField && state.windField.length) {
-      const t0 = state.windField[0].fetchedAt;
-      if (t0) bits.push(state.windField.length + " cells");
-      const age = t0 ? (Date.now() - t0) / 3600000 : null;
-      if (age != null) bits.push(age < 1.1 ? "fresh" : age.toFixed(1) + "h stale");
+      const age = CMGWind.fieldAgeHours(state.windField);
+      if (age != null) bits.push(state.windField.length + " cells");
+      if (age != null) bits.push(age < 1.1 ? "fresh" : age.toFixed(1) + "h stale" + (age > STALE_FIELD_HOURS ? " \u00b7 STALE route wind" : ""));
     }
     return bits.length ? bits.join(" \u00b7 ") : "";
   }
@@ -327,7 +329,7 @@
     if (fieldBusy) { fieldPending = true; return; }
     const pts = sampleRoutePoints(rt);
     if (pts.length < 2) return;
-    fieldBusy = true; fieldPending = false;
+    fieldBusy = true; fieldPending = false; fieldStale = false;
     const key = fieldKey();
     const el = document.getElementById("windLabel");
     if (el) el.textContent = setWindLine(el.textContent, "sampling " + pts.length + " cells\u2026");
@@ -336,12 +338,16 @@
       // Marks, lake or source changed while this was in flight: the field
       // belongs to an old route, so drop it.
       if (key !== fieldKey()) { fieldPending = true; }
-      else if (field && field.length) {
+      else if (field && field.length && (field.length >= pts.length || !state.windField || !state.windField.length)) {
         state.windField = field;
         compute(true);
         if (el) el.textContent = setWindLine(el.textContent, field.length + " cells along track");
       } else if (el) {
-        el.textContent = setWindLine(el.textContent, "no forecast cells along track");
+        // Fetch failed or came back short: keep the saved field and show its age.
+        const age = CMGWind.fieldAgeHours(state.windField);
+        el.textContent = setWindLine(el.textContent, age != null
+          ? "kept saved route wind (" + age.toFixed(1) + "h old" + (age > STALE_FIELD_HOURS ? ", STALE" : "") + ")"
+          : "no forecast cells along track");
       }
     } catch (e) {}
     fieldBusy = false;
@@ -513,7 +519,7 @@
     const rw = document.getElementById("routeWarn");
     rw.innerHTML = warn.join(" "); rw.classList.toggle("hidden", warn.length === 0);
     updatePolarDelta();
-    const needField = !state.windField || (rt.totalNm > 20 && state.windField.length < 4);
+    const needField = fieldStale || !state.windField || (rt.totalNm > 20 && state.windField.length < 4);
     if (!skipRefine && needField) refineWindField(rt);
   }
   async function refreshWind() {
@@ -534,10 +540,12 @@
         document.getElementById("tws").value = Math.round(state.tws * 10) / 10;
         document.getElementById("twd").value = Math.round(state.twd);
         const leave = Math.abs(clockMs() - Date.now()) < 120000 ? "now" : "at leave";
+        fieldStale = CMGWind.fieldNeedsRefresh(state.windField, FIELD_REFRESH_HOURS * 0.9);
         el.textContent = src.toUpperCase() + " " + sample.tws.toFixed(0) + " kn FROM " +
           String(Math.round(sample.twd)).padStart(3,"0") + "\u00b0 " + leave + " @ " + (sample.time || "").slice(11,16) +
           " \u00b7 " + buildStamp();
       } else {
+        fieldStale = CMGWind.fieldNeedsRefresh(state.windField, FIELD_REFRESH_HOURS * 0.9);
         el.textContent = src.toUpperCase() + " has no forecast near the departure time \u2014 using TWS/TWD fields \u00b7 " + buildStamp();
       }
     } catch (e) {
@@ -600,12 +608,11 @@
     const saved = CMGWind.loadField && CMGWind.loadField();
     if (saved && saved.field && saved.field.length) {
       state.windField = saved.field;
-      const age = saved.savedAt ? (Date.now() - saved.savedAt) / 3600000 : null;
-      if (age != null && age > STALE_FIELD_HOURS && state.windSource !== "manual") {
-        // Don't silently trust a many-hours-old field: refresh first so a
-        // live fetch replaces it, falling back to the (stale) cache on failure.
-        refreshWind();
-      }
+      // The saved field is only a starting point. openChart() calls
+      // refreshWind() next: on a good fetch that re-requests the centre
+      // forecast and, if this field is older than FIELD_REFRESH_HOURS, rebuilds
+      // it for the current route (see fieldStale). If the fetch fails the saved
+      // field is kept and its age / STALE flag are shown.
     }
     const cached = CMGWind.loadCache();
     if (cached) state.windPack = cached;
