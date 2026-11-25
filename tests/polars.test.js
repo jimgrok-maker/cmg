@@ -25,3 +25,14 @@ test("speed is capped near hull speed and best upwind angle is outside the no-go
   for (const tws of [6, 12, 20, 30]) for (const twa of [50, 90, 150]) assert.ok(P.boatSpeed(cat22, tws, twa) <= P.hullSpeed(cat22.lwl) * 1.05 + 1e-9);
   for (const id of Object.keys(P.CLASSES)) assert.ok(P.bestUpwindTwa(P.CLASSES[id], 12) >= ctx.CMGRoute.NOGO);
 });
+
+test("genericClass clamps LWL to [8, 80] and falls back to 23 on invalid/non-positive", () => {
+  assert.equal(P.genericClass(25).lwl, 25);
+  assert.equal(P.genericClass(3).lwl, 8);
+  assert.equal(P.genericClass(8).lwl, 8);
+  assert.equal(P.genericClass(80).lwl, 80);
+  assert.equal(P.genericClass(150).lwl, 80);
+  for (const bad of [0, -10, NaN, Infinity, -Infinity, undefined, null, "", "abc"]) {
+    assert.equal(P.genericClass(bad).lwl, 23, "fallback for " + String(bad));
+  }
+});

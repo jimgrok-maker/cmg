@@ -4,12 +4,12 @@ Android sailing **trip planner** with a live SOG and gold GPS track. Not a websi
 
 Tap marks on an OSM map, get a polar-based course-made-good estimate from forecast wind, and see whether each leg stays on the water. Legs that cross land are flagged. Always check official NOAA / CHS depths before you go.
 
-**Current build:** `0.3.22` (`versionCode` 43) · package `com.cmg.erie` · debug-signed.
+**Current build:** `0.3.23` (`versionCode` 44) · package `com.cmg.erie` · debug-signed.
 
 ## Install
 
 1. Repo → **Actions** → latest green **Build APK** run.
-2. Download the artifact **cmg-apk**. The file inside is `cmg-0.3.22-debug.apk`.
+2. Download the artifact **cmg-apk**. The file inside is `cmg-0.3.23-debug.apk`.
 3. On the phone, allow install from this source and tap the APK.
 
 Push to `main` or **Actions → Build APK → Run workflow** to rebuild.

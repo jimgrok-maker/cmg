@@ -16,19 +16,44 @@ test("all app JS parses", () => {
   }
 });
 
-test("BUILD stamp matches versionName", () => {
+test("BUILD stamp and README match versionName and versionCode", () => {
   const gradle = fs.readFileSync(path.join(ROOT, "app", "build.gradle.kts"), "utf8");
   const ver = gradle.match(/versionName = "([^"]+)"/)[1];
+  const code = gradle.match(/versionCode = (\d+)/)[1];
   const { ctx } = load();
   assert.equal(ctx.CMGWind.BUILD, ver);
+  const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+  assert.ok(readme.includes("`" + ver + "`"), "README versionName");
+  assert.ok(readme.includes("`versionCode` " + code), "README versionCode");
+  assert.ok(readme.includes(`cmg-${ver}-debug.apk`), "README apk filename");
 });
 
-test("Android manifest keeps the reviewed settings", () => {
+test("Android manifest and MainActivity keep the reviewed and hardened settings", () => {
   const m = fs.readFileSync(path.join(ROOT, "app", "src", "main", "AndroidManifest.xml"), "utf8");
   assert.match(m, /android:allowBackup="false"/);
   for (const c of ["orientation", "screenSize", "screenLayout", "smallestScreenSize", "uiMode"]) assert.match(m, new RegExp("configChanges=\"[^\"]*\\b" + c + "\\b"));
   const act = fs.readFileSync(path.join(ROOT, "app", "src", "main", "java", "com", "cmg", "erie", "MainActivity.java"), "utf8");
-  for (const s of ["shouldOverrideUrlLoading", "onPause", "onResume", "onDestroy"]) assert.ok(act.includes(s), s);
+  for (const s of [
+    "shouldOverrideUrlLoading", "onPause", "onResume", "onDestroy",
+    "sanitizeFilename", "ClipData.newRawUri", "FLAG_GRANT_READ_URI_PERMISSION", "runOnUiThread",
+    "isAppOrigin", "removeView(webView)", "private Object backCallback", "Api33Back", "OnBackInvokedCallback"
+  ]) assert.ok(act.includes(s), s);
+  assert.match(act, /"https"\.equalsIgnoreCase\(scheme\)\s*&&\s*APP_HOST\.equalsIgnoreCase/);
+  assert.match(act, /"http"\.equalsIgnoreCase\(scheme\)\s*\|\|\s*"https"\.equalsIgnoreCase\(scheme\)/);
+});
+
+test("fence.js removed, CSS styles datetime-local, hybrid label updated, CI runs tests", () => {
+  assert.equal(fs.existsSync(path.join(WWW, "js", "fence.js")), false, "fence.js removed");
+  const html = fs.readFileSync(path.join(WWW, "index.html"), "utf8");
+  assert.doesNotMatch(html, /fence\.js/);
+  assert.match(html, /boat speed < 2 kn/);
+  assert.doesNotMatch(html, /if VMG < 2 kn/);
+  const css = fs.readFileSync(path.join(WWW, "css", "app.css"), "utf8");
+  assert.match(css, /input\[type="datetime-local"\]/);
+  const ci = fs.readFileSync(path.join(ROOT, ".github", "workflows", "android.yml"), "utf8");
+  assert.match(ci, /pull_request:/);
+  assert.match(ci, /needs:\s*test/);
+  assert.match(ci, /node --test 'tests\/\*\.test\.js'/);
 });
 
 test("exported GPX has the GPX 1.1 route structure", () => {

@@ -114,3 +114,53 @@ test("other lakes still route (no islands)", () => {
   assert.ok(isFinite(rt.tHours) && rt.tHours > 0 && !rt.landHit);
   assert.ok(p.length > 0);
 });
+
+test("fast plan skips zig-zag tacks when direct motoring is faster and sets motorUsed", () => {
+  const a = { lat: 41.60, lon: -82.30 }, b = { lat: 41.75, lon: -82.30 }; // due north, open Lake Erie
+  // Dead upwind (twd 0), 10 kn wind, 6 kn motor: motoring is much faster than tacking -> straight no-go motor leg
+  const fast = route([a, b], 10, 0, { plan: "fast", motor: 6 });
+  assert.equal(fast.points.length, 2, "no unnecessary zig-zag tacks");
+  assert.equal(fast.motorUsed, true, "fast-mode no-go leg sets motorUsed");
+  assert.ok(fast.motorNm > 8 && Math.abs(fast.tHours - fast.totalNm / 6) < 0.05);
+  // Dead upwind, 18 kn wind, 2 kn motor: tacking VMG > 2 kn -> still generates tacks
+  const slowMotor = route([a, b], 18, 0, { plan: "fast", motor: 2 });
+  assert.ok(slowMotor.points.length > 2, "tacks when sailing is faster than 2 kn motor");
+});
+
+test("hybrid skips zig-zag tacks when tack speed < 2 kn, and calm skips tacks", () => {
+  const a = { lat: 41.60, lon: -82.30 }, b = { lat: 41.75, lon: -82.30 };
+  // Very light upwind (2.8 kn): tack speed < 2 kn -> hybrid motors straight without zig-zagging
+  const hyb = route([a, b], 2.8, 0, { hybrid: true, motor: 4 });
+  assert.equal(hyb.points.length, 2, "hybrid skips zig-zag when tack speed < 2 kn");
+  assert.equal(hyb.motorUsed, true);
+  assert.ok(isFinite(hyb.tHours) && hyb.tHours > 0);
+  // Calm upwind (1 kn): sail plan does not emit zig-zag tacks
+  const calm = route([a, b], 1, 0);
+  assert.equal(calm.points.length, 2, "calm wind skips zig-zag tacks");
+  assert.equal(isFinite(calm.tHours), false);
+});
+
+test("zero-distance duplicate legs take 0 h even in calm or no-go wind", () => {
+  const a = { lat: 41.60, lon: -82.30 }, b = { lat: 41.60, lon: -82.10 }; // east leg
+  // Duplicate start point with twd=0 (bearing(a,a)=0 -> no-go) and tws=12:
+  const nogoDup = route([a, a, b], 12, 0);
+  assert.ok(isFinite(nogoDup.tHours) && nogoDup.tHours > 0);
+  assert.equal(nogoDup.segs[0].hours, 0);
+  // Duplicate start point in dead calm (tws=0), only duplicate points:
+  const calmDup = route([a, a], 0, 0);
+  assert.equal(calmDup.tHours, 0);
+  assert.equal(calmDup.motorUsed, false);
+  // Duplicate start point in fast mode does not falsely flag motorUsed on 0 nm:
+  const fastDup = route([a, a], 12, 0, { plan: "fast" });
+  assert.equal(fastDup.tHours, 0);
+  assert.equal(fastDup.motorUsed, false);
+});
+
+test("CMGGeo.ringBounds returns cached bounding box", () => {
+  const ring = ctx.CMGLakeById("erie").ring;
+  const b1 = G.ringBounds(ring);
+  const b2 = G.ringBounds(ring);
+  assert.strictEqual(b1, b2, "cached in WeakMap");
+  assert.ok(b1.minLon < b1.cLon && b1.cLon < b1.maxLon);
+  assert.ok(b1.minLat < b1.cLat && b1.cLat < b1.maxLat);
+});

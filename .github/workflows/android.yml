@@ -3,10 +3,32 @@ name: Build APK
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install jsdom for full-page tests
+        run: |
+          mkdir -p /tmp/cmg-test-deps
+          npm --prefix /tmp/cmg-test-deps install --no-save jsdom
+
+      - name: Run JS and jsdom tests
+        env:
+          NODE_PATH: /tmp/cmg-test-deps/node_modules
+        run: node --test 'tests/*.test.js'
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
