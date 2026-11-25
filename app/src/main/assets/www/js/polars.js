@@ -60,7 +60,8 @@
     return best;
   }
   function genericClass(lwlFt) {
-    const lwl = Number(lwlFt) || 23;
+    const raw = Number(lwlFt);
+    const lwl = (isFinite(raw) && raw > 0) ? Math.min(80, Math.max(8, raw)) : 23;
     return { id:"generic", name:"Generic " + lwl.toFixed(1) + " ft LWL", loa:lwl, lwl, draft:null, phrf:null, notes:"Hull speed " + hullSpeed(lwl).toFixed(2) + " kn", upwind:1, reach:1, run:1 };
   }
   w.CMGPolars = { windScale, hullSpeed, CLASSES, boatSpeed, vmgToWind, bestUpwindTwa, genericClass, shapeAt, TWA_SHAPE };

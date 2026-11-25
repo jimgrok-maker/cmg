@@ -43,7 +43,7 @@ header button { background: var(--panel); color: var(--ink); border: 1px solid v
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
 .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.45rem; }
 label { display: flex; flex-direction: column; gap: 0.18rem; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-select, input[type="text"], input[type="number"], button.primary, button.ghost {
+select, input[type="text"], input[type="number"], input[type="datetime-local"], button.primary, button.ghost {
   font: inherit; color: var(--ink); background: #101816; border: 1px solid var(--line); border-radius: 6px; padding: 0.42rem 0.5rem;
   width: 100%; min-height: 42px; color-scheme: dark;
 }

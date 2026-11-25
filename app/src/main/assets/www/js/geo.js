@@ -55,9 +55,14 @@
       const b0 = Math.max(0, Math.floor((y0 - minLat) / h)), b1 = Math.min(BANDS - 1, Math.floor((y1 - minLat) / h));
       for (let b = b0; b <= b1; b++) bands[b].push(i);
     }
-    ix = { minLon, maxLon, minLat, maxLat, h, bands };
+    const bounds = { minLon, maxLon, minLat, maxLat, cLon: (minLon + maxLon) / 2, cLat: (minLat + maxLat) / 2 };
+    ix = { minLon, maxLon, minLat, maxLat, h, bands, bounds };
     if (ringIndex) ringIndex.set(ring, ix);
     return ix;
+  }
+  function ringBounds(ring) {
+    if (!ring || !ring.length) return null;
+    return indexFor(ring).bounds;
   }
   function pointInRing(lon, lat, ring) {
     if (!ring || ring.length < 3 || !isFinite(lon) || !isFinite(lat)) return false;
@@ -124,19 +129,39 @@
   // DOCK_EXIT_NM is still a crossing.
   function segmentWet(a, b, lakeRing, islands) {
     if (!a || !b || !inLake(a, lakeRing) || !inLake(b, lakeRing)) return false;
+    const dist = haversineNm(a, b);
+    let nearIslands = null;
+    if (islands && islands.length) {
+      if (Math.abs(a.lon - b.lon) > 180) {
+        nearIslands = islands;
+      } else {
+        const padLat = Math.max(0.02, dist * 0.001);
+        const padLon = Math.max(0.02, dist * 0.0015);
+        const sMinLat = Math.min(a.lat, b.lat) - padLat;
+        const sMaxLat = Math.max(a.lat, b.lat) + padLat;
+        const sMinLon = Math.min(a.lon, b.lon) - padLon;
+        const sMaxLon = Math.max(a.lon, b.lon) + padLon;
+        nearIslands = [];
+        for (let i = 0; i < islands.length; i++) {
+          const bnd = ringBounds(islands[i].ring);
+          if (!bnd) continue;
+          if (bnd.maxLat < sMinLat || bnd.minLat > sMaxLat || bnd.maxLon < sMinLon || bnd.minLon > sMaxLon) continue;
+          nearIslands.push(islands[i]);
+        }
+      }
+    }
     const startDock = isDock(a);
     const endDock = isDock(b);
-    const startIsl = startDock ? islandAt(a, islands) : null;
-    const endIsl = endDock ? islandAt(b, islands) : null;
-    if (!startDock && !onWater(a, lakeRing, islands)) return false;
-    if (!endDock && !onWater(b, lakeRing, islands)) return false;
-    const dist = haversineNm(a, b);
+    const startIsl = startDock && nearIslands && nearIslands.length ? islandAt(a, nearIslands) : null;
+    const endIsl = endDock && nearIslands && nearIslands.length ? islandAt(b, nearIslands) : null;
+    if (!startDock && !onWater(a, lakeRing, nearIslands)) return false;
+    if (!endDock && !onWater(b, lakeRing, nearIslands)) return false;
     const samples = samplesOnSegment(a, b, Math.max(8, Math.ceil(dist * 30)));
     let leftStart = !startIsl;
     for (let i = 0; i < samples.length; i++) {
       const s = samples[i];
       if (!inLake(s, lakeRing)) return false;
-      const isl = islandAt(s, islands);
+      const isl = nearIslands && nearIslands.length ? islandAt(s, nearIslands) : null;
       if (!isl) { leftStart = true; continue; }
       const along = haversineNm(a, s);
       const toEnd = haversineNm(s, b);
@@ -146,5 +171,5 @@
     }
     return true;
   }
-  w.CMGGeo = { toRad, toDeg, haversineNm, initialBearing, destPoint, angleDiff, wrap360, pointInRing, onWater, samplesOnSegment, setDocks, isDock, islandAt, segmentWet, DOCK_NM, DOCK_EXIT_NM };
+  w.CMGGeo = { toRad, toDeg, haversineNm, initialBearing, destPoint, angleDiff, wrap360, ringBounds, pointInRing, onWater, samplesOnSegment, setDocks, isDock, islandAt, segmentWet, DOCK_NM, DOCK_EXIT_NM };
 })(window);

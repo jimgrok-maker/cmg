@@ -72,11 +72,76 @@ test("fieldNeedsRefresh: old or unknown-age route fields are rebuilt, fresh ones
 });
 
 test("a failed fetchMany returns nothing and leaves the saved field untouched", async () => {
-  const { ctx, store } = load();
+  let calls = 0;
+  const fetch = async () => { calls++; throw new Error("offline"); };
+  const { ctx, store } = load({ fetch });
   const saved = { savedAt: Date.now() - 5 * 3600000, field: [{ lat: 41.5, lon: -82.7, fetchedAt: Date.now() - 5 * 3600000, hourly: { time: [], tws: [], twd: [], gust: [], code: [] } }] };
   store["cmg.wind.field"] = JSON.stringify(saved);
-  const out = await ctx.CMGWind.fetchMany([{ lat: 41.5, lon: -82.7 }, { lat: 41.6, lon: -82.8 }], "hrrr", tz);
+  const pts = Array.from({ length: 12 }, (_, i) => ({ lat: 41.5 + i * 0.02, lon: -82.7 }));
+  const out = await ctx.CMGWind.fetchMany(pts, "hrrr", tz, "erie");
   assert.equal(out.length, 0);
+  assert.equal(calls, 1, "batch failure skips the 12 sequential retries");
   assert.equal(JSON.parse(store["cmg.wind.field"]).savedAt, saved.savedAt);
   assert.equal(ctx.CMGWind.loadField().field.length, 1);
+});
+
+test("fetchMany back-fill does not overwrite cmg.wind.cache and tags source + lakeId", async () => {
+  const mk = (a, b) => ({ latitude: +a, longitude: +b, hourly: { time: ["2026-07-04T12:00"], wind_speed_10m: [11], wind_direction_10m: [220], wind_gusts_10m: [14], weather_code: [0] } });
+  let sawSignal = false;
+  const fetch = async (url, init) => {
+    if (init && init.signal) sawSignal = true;
+    const u = new URL(url); const la = u.searchParams.get("latitude").split(","), lo = u.searchParams.get("longitude").split(",");
+    const list = la.map((a, i) => mk(a, lo[i]));
+    return { ok: true, json: async () => (la.length > 1 ? list.slice(0, 1) : list[0]) };
+  };
+  const { ctx, store } = load({ fetch });
+  const origCenter = { fetchedAt: Date.now(), source: "hrrr", lakeId: "erie", lat: 41.66, lon: -82.82, tz, hourly: { time: ["2026-07-04T12:00"], tws: [7], twd: [180], gust: [null], code: [0] } };
+  store["cmg.wind.cache"] = JSON.stringify(origCenter);
+  const field = await ctx.CMGWind.fetchMany([{ lat: 41.5, lon: -82.7 }, { lat: 41.6, lon: -82.8 }], "gfs", tz, "erie");
+  assert.equal(field.length, 2);
+  assert.equal(sawSignal, true, "AbortController signal passed to fetch");
+  assert.equal(JSON.parse(store["cmg.wind.cache"]).hourly.tws[0], 7, "center cache untouched by back-fill");
+  const saved = ctx.CMGWind.loadField();
+  assert.equal(saved.source, "gfs");
+  assert.equal(saved.lakeId, "erie");
+  assert.equal(saved.field[0].lakeId, "erie");
+  assert.equal(saved.field[1].lakeId, "erie");
+});
+
+test("packMatches and nearestPack enforce source, lakeId, and max distance", () => {
+  const { ctx } = load();
+  const W = ctx.CMGWind;
+  const erieCell = { source: "hrrr", lakeId: "erie", lat: 41.66, lon: -82.82, tz, hourly: { time: ["2026-07-04T12:00"], tws: [10], twd: [270], gust: [null], code: [0] } };
+  assert.equal(W.packMatches(erieCell, { source: "hrrr", lakeId: "erie", lat: 41.6, lon: -82.8 }), true);
+  assert.equal(W.packMatches(erieCell, { source: "gfs", lakeId: "erie", lat: 41.6, lon: -82.8 }), false, "wrong source");
+  assert.equal(W.packMatches(erieCell, { source: "hrrr", lakeId: "huron", lat: 41.6, lon: -82.8 }), false, "wrong lakeId");
+  // Lake Superior is > 300 nm away from Lake Erie
+  assert.equal(W.packMatches(erieCell, { source: "hrrr", lat: 47.7, lon: -87.5 }), false, "too far");
+  assert.equal(W.nearestPack([erieCell], 47.7, -87.5), null, "nearestPack rejects packs beyond max distance");
+  assert.equal(W.nearestPack([erieCell], 41.6, -82.8, { source: "gfs", lakeId: "erie" }), null, "nearestPack rejects wrong source");
+  assert.equal(W.nearestPack([erieCell], 41.6, -82.8, { source: "hrrr", lakeId: "huron" }), null, "nearestPack rejects wrong lakeId");
+  assert.ok(W.nearestPack([erieCell], 41.6, -82.8, { source: "hrrr", lakeId: "erie" }), "matching pack accepted");
+});
+
+test("atTime caches Intl.DateTimeFormat and parsed timestamps", () => {
+  const { ctx } = load();
+  const W = ctx.CMGWind;
+  const OrigDTF = Intl.DateTimeFormat;
+  let constructed = 0;
+  Intl.DateTimeFormat = function (...args) { constructed++; return new OrigDTF(...args); };
+  try {
+    const times = Array.from({ length: 48 }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 6, 4 + Math.floor(i / 24), i % 24));
+      return d.toISOString().slice(0, 16);
+    });
+    const p = { tz: "America/Chicago", fetchedAt: Date.now(), hourly: { time: times, tws: times.map(() => 10), twd: times.map(() => 180), gust: times.map(() => null), code: times.map(() => 0) } };
+    const t0 = Date.parse("2026-07-04T17:00Z");
+    const r1 = W.atTime(p, t0);
+    const r2 = W.atTime(p, t0 + 3600000);
+    const r3 = W.atTime(p, t0 + 7200000);
+    assert.ok(r1 && r2 && r3);
+    assert.ok(constructed <= 1, "Intl.DateTimeFormat cached per tz, got " + constructed);
+  } finally {
+    Intl.DateTimeFormat = OrigDTF;
+  }
 });

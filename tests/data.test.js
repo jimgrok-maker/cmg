@@ -51,3 +51,12 @@ test("other lakes keep their outlines and marks", () => {
     assert.ok(G.pointInRing(lake.center[1], lake.center[0], lake.ring), lake.id + " center inside its ring");
   }
 });
+
+test("every listed POI across all waters sits inside its lake ring", () => {
+  const byId = Object.fromEntries(ctx.CMG_LAKES.map((l) => [l.id, l]));
+  for (const p of ctx.CMG_POIS) {
+    const lake = byId[p.lake];
+    assert.ok(lake, "known lake for " + p.id);
+    assert.equal(G.pointInRing(p.lon, p.lat, lake.ring), true, `${p.lake}/${p.id} inside ring`);
+  }
+});

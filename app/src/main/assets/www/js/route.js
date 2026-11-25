@@ -20,13 +20,7 @@
     return CMGGeo.segmentWet(a, b, lakeRing, islands);
   }
   function ringBounds(ring) {
-    let minLon = 1e9, maxLon = -1e9, minLat = 1e9, maxLat = -1e9;
-    ring.forEach(function (p) {
-      minLon = Math.min(minLon, p[0]); maxLon = Math.max(maxLon, p[0]);
-      minLat = Math.min(minLat, p[1]); maxLat = Math.max(maxLat, p[1]);
-    });
-    return { minLon: minLon, maxLon: maxLon, minLat: minLat, maxLat: maxLat,
-      cLon: (minLon + maxLon) / 2, cLat: (minLat + maxLat) / 2 };
+    return CMGGeo.ringBounds(ring);
   }
   // Rounding marks around an island: bbox corners and edge midpoints at two
   // clearances (~0.25 nm and ~0.8 nm).
@@ -56,14 +50,14 @@
     const nodes = [from, to];
     (islands || []).forEach(function (isl) {
       const b = ringBounds(isl.ring);
-      if (b.maxLat < minLat || b.minLat > maxLat || b.maxLon < minLon || b.minLon > maxLon) return;
+      if (!b || b.maxLat < minLat || b.minLat > maxLat || b.maxLon < minLon || b.minLon > maxLon) return;
       if (b.maxLat - b.minLat < 0.003 && b.maxLon - b.minLon < 0.004) return; // islets: bigger islands' marks clear them
       candidatesFor(isl).forEach(function (p) { if (CMGGeo.onWater(p, lakeRing, islands)) nodes.push(p); });
     });
     // Lazy A*: a node's edge from its best parent is only checked for water
-    // when the node is popped. A dry edge is remembered and the node is
-    // re-parented to its next-best closed neighbour (no check yet), so each
-    // pop costs one water check.
+    // when the node is popped. A dry edge is remembered (symmetrically) and
+    // the node is re-parented to its next-best closed neighbour (no check yet),
+    // so each pop costs one water check.
     const n = nodes.length;
     const g = new Array(n).fill(Infinity), prev = new Array(n).fill(-1), done = new Array(n).fill(false);
     const hs = nodes.map(function (p) { return CMGGeo.haversineNm(p, to); });
@@ -87,6 +81,7 @@
       if (u < 0) break;
       if (!segmentWet(nodes[prev[u]], nodes[u], lakeRing, islands)) {
         bad[prev[u] + ":" + u] = true;
+        bad[u + ":" + prev[u]] = true;
         reparent(u);
         continue;
       }
@@ -172,6 +167,7 @@
   // Time to cover a no-go leg by tacking at the best upwind angle: sailed
   // distance = dist * cos(offWind) / cos(opt).
   function tackingHours(cls, tws, twa, dist) {
+    if (dist < 1e-9) return 0;
     const opt = Math.max(NOGO + 1, CMGPolars.bestUpwindTwa(cls, tws));
     const v = CMGPolars.boatSpeed(cls, tws, opt);
     if (!(v > 0.15)) return Infinity;
@@ -189,8 +185,8 @@
     if (Math.abs(twa) < NOGO) {
       bsp = 0; mode = "nogo";
       // A no-go leg is never free: fast plan motors it, sail plan is timed as
-      // if tacked at the best upwind angle.
-      hours = fast ? dist / mkn : tackingHours(cls, tws, twa, dist);
+      // if tacked at the best upwind angle. Zero-distance duplicate legs take 0 h.
+      hours = dist < 1e-9 ? 0 : (fast ? dist / mkn : tackingHours(cls, tws, twa, dist));
     } else {
       hours = dist < 1e-9 ? 0 : (bsp > 0.15 ? dist / bsp : Infinity);
     }
@@ -203,7 +199,7 @@
   // sail speed (fast plan) or whenever a motor is offered (hybrid compare).
   function applyMotor(ev, mkn, fast, hybrid) {
     if ((fast && ev.mode !== "nogo" && ev.bsp < mkn) || (hybrid && ev.motorOffered)) {
-      ev.mode = "motor"; ev.bsp = mkn; ev.hours = ev.dist / mkn; ev.color = "#6b8ea8"; ev.toward = mkn; ev.motorKn = mkn;
+      ev.mode = "motor"; ev.bsp = mkn; ev.hours = ev.dist < 1e-9 ? 0 : ev.dist / mkn; ev.color = "#6b8ea8"; ev.toward = mkn; ev.motorKn = mkn;
     }
     return ev;
   }
@@ -244,6 +240,8 @@
     return { segs: out, endHours: acc };
   }
   function buildRoute(waypoints, cls, tws, twd, lakeRing, islands, hybrid, windAtFn, motorKn, plan) {
+    const mkn = (motorKn >= 2 && motorKn <= 8) ? motorKn : MOTOR_KN;
+    const fast = plan === "fast";
     const fallback = { tws: tws, twd: twd };
     const path = (waypoints || []).slice();
     if (!path.length) return { points: [], segs: [], tHours: 0, totalNm: 0, sailNm: 0, motorNm: 0, nogoNm: 0, motorUsed: false, landHit: false, nogoHit: false, pctVmg2: 0, pctVmg4: 0 };
@@ -264,8 +262,8 @@
     function runLeg(a, b) {
       const part = splitByHour(a, b, cls, lakeRing, islands, hybrid, tHours, windAtFn, fallback, motorKn, plan);
       part.segs.forEach(function (ev) {
-        if (ev.mode === "motor") { motorUsed = true; motorNm += ev.dist; }
-        else if (ev.mode === "nogo") { nogoHit = true; nogoNm += ev.dist; if (plan === "fast") motorNm += ev.dist; }
+        if (ev.mode === "motor") { if (ev.dist >= 1e-9) motorUsed = true; motorNm += ev.dist; }
+        else if (ev.mode === "nogo") { nogoHit = true; nogoNm += ev.dist; if (fast && ev.dist >= 1e-9) { motorUsed = true; motorNm += ev.dist; } }
         else sailNm += ev.dist;
         if (ev.land) landHit = true;
         totalNm += ev.dist;
@@ -277,10 +275,19 @@
     }
     for (let i = 0; i < wet.length - 1; i++) {
       const a = expanded[expanded.length - 1], b = wet[i + 1];
+      const dist = CMGGeo.haversineNm(a, b);
       const w = windAt(windAtFn, fallback, isFinite(tHours) ? tHours : 0, a);
       let legPts = [];
-      if (Math.abs(twaForCourse(w.twd, CMGGeo.initialBearing(a, b))) < NOGO) {
-        legPts = beatToMark(a, b, cls, w, lakeRing, islands, 0) || [];
+      const twa = twaForCourse(w.twd, CMGGeo.initialBearing(a, b));
+      if (dist >= 1e-9 && Math.abs(twa) < NOGO) {
+        const calm = !isFinite(w.tws) || w.tws <= 2;
+        const opt = Math.max(NOGO + 1, CMGPolars.bestUpwindTwa(cls, w.tws));
+        const tackBsp = CMGPolars.boatSpeed(cls, w.tws, opt);
+        const motorFaster = fast && (dist / mkn <= tackingHours(cls, w.tws, twa, dist));
+        const hybridSlow = !!hybrid && tackBsp < 2;
+        if (!calm && !motorFaster && !hybridSlow) {
+          legPts = beatToMark(a, b, cls, w, lakeRing, islands, 0) || [];
+        }
       }
       let cur = a;
       legPts.forEach(function (p) {

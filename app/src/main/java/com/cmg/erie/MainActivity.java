@@ -3,10 +3,14 @@ package com.cmg.erie;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.webkit.GeolocationPermissions;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -14,7 +18,10 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
+import androidx.annotation.RequiresApi;
 import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewClientCompat;
@@ -26,13 +33,47 @@ import java.nio.charset.StandardCharsets;
 public class MainActivity extends Activity {
     private static final String APP_HOST = "appassets.androidplatform.net";
     private WebView webView;
+    private Object backCallback;
+
+    @RequiresApi(33)
+    private static final class Api33Back {
+        static Object register(Activity activity, Runnable onBack) {
+            OnBackInvokedCallback cb = onBack::run;
+            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb);
+            return cb;
+        }
+
+        static void unregister(Activity activity, Object cb) {
+            if (cb instanceof OnBackInvokedCallback) {
+                activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
+                        (OnBackInvokedCallback) cb);
+            }
+        }
+    }
+
+    private static String sanitizeFilename(String filename) {
+        String safe = filename == null ? "" : filename.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (safe.isEmpty() || ".".equals(safe) || "..".equals(safe) || safe.startsWith(".")) {
+            return "cmg-route.gpx";
+        }
+        return safe;
+    }
+
+    private static boolean isAppOrigin(String origin) {
+        if (origin == null || origin.isEmpty()) return false;
+        Uri u = Uri.parse(origin);
+        return "https".equalsIgnoreCase(u.getScheme())
+                && APP_HOST.equalsIgnoreCase(u.getHost())
+                && u.getPort() == -1;
+    }
 
     public class CmBridge {
         @JavascriptInterface
         public String shareGpx(String filename, String text) {
             try {
                 if (text == null || text.isEmpty()) return "empty route";
-                String safe = filename == null ? "cmg-route.gpx" : filename.replaceAll("[^A-Za-z0-9._-]", "_");
+                String safe = sanitizeFilename(filename);
                 File f = new File(getCacheDir(), safe);
                 try (FileOutputStream out = new FileOutputStream(f)) {
                     out.write(text.getBytes(StandardCharsets.UTF_8));
@@ -42,8 +83,16 @@ public class MainActivity extends Activity {
                 send.setType("application/gpx+xml");
                 send.putExtra(Intent.EXTRA_STREAM, uri);
                 send.putExtra(Intent.EXTRA_SUBJECT, safe);
+                send.setClipData(ClipData.newRawUri(safe, uri));
                 send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivity(Intent.createChooser(send, "Share CMG GPX"));
+                Intent chooser = Intent.createChooser(send, "Share CMG GPX");
+                chooser.setClipData(ClipData.newRawUri(safe, uri));
+                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) {
+                        startActivity(chooser);
+                    }
+                });
                 return "ok";
             } catch (Exception e) {
                 return e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage());
@@ -57,6 +106,10 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         webView = new WebView(this);
         setContentView(webView);
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            backCallback = Api33Back.register(this, this::handleBack);
+        }
 
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{
@@ -75,17 +128,24 @@ public class MainActivity extends Activity {
                 return assetLoader.shouldInterceptRequest(request.getUrl());
             }
 
-            // Only the bundled app may load in this WebView (it has the
-            // CMGNative bridge). Any other link (e.g. Leaflet / OSM
-            // attribution) opens in the user's browser instead.
+            // Only the bundled app (https + APP_HOST) may load in this WebView
+            // (it has the CMGNative bridge). Other http/https links (e.g.
+            // Leaflet / OSM attribution) open in the user's browser; all other
+            // schemes are blocked.
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
-                if (APP_HOST.equals(url.getHost())) return false;
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, url));
-                } catch (Exception ignored) {
-                    // No browser available: just stay on the app page.
+                if (url == null) return true;
+                String scheme = url.getScheme();
+                if ("https".equalsIgnoreCase(scheme) && APP_HOST.equalsIgnoreCase(url.getHost())) {
+                    return false;
+                }
+                if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, url));
+                    } catch (Exception ignored) {
+                        // No browser available: just stay on the app page.
+                    }
                 }
                 return true;
             }
@@ -93,7 +153,7 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
-                callback.invoke(origin, locationGranted(), false);
+                callback.invoke(origin, isAppOrigin(origin) && locationGranted(), false);
             }
         });
 
@@ -129,8 +189,16 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
+            Api33Back.unregister(this, backCallback);
+            backCallback = null;
+        }
         if (webView != null) {
             webView.removeJavascriptInterface("CMGNative");
+            ViewParent parent = webView.getParent();
+            if (parent instanceof ViewGroup) {
+                ((ViewGroup) parent).removeView(webView);
+            }
             webView.destroy();
             webView = null;
         }
@@ -150,11 +218,9 @@ public class MainActivity extends Activity {
         }
     }
 
-    @Override
-    @SuppressWarnings("deprecation")
-    public void onBackPressed() {
+    private void handleBack() {
         if (webView == null) {
-            super.onBackPressed();
+            finish();
             return;
         }
         webView.evaluateJavascript(
@@ -162,5 +228,15 @@ public class MainActivity extends Activity {
                 value -> {
                     if (!"true".equals(value)) runOnUiThread(this::finish);
                 });
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        if (webView == null) {
+            super.onBackPressed();
+            return;
+        }
+        handleBack();
     }
 }

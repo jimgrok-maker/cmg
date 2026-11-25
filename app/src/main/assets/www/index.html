@@ -172,7 +172,7 @@
         <p id="windLabel" class="disclaimer"></p>
         <p id="polarDelta" class="disclaimer"></p>
         <label style="flex-direction:row;align-items:center;gap:0.45rem;text-transform:none;margin:0.3rem 0">
-          <input type="checkbox" id="hybrid" /> Hybrid compare — motor at the setup speed if VMG < 2 kn
+          <input type="checkbox" id="hybrid" /> Hybrid compare — motor at the setup speed if boat speed < 2 kn
         </label>
         <label style="flex-direction:row;align-items:center;gap:0.45rem;text-transform:none;margin:0.3rem 0">
           <!-- Keep the "8" in sync with OFFSET_NM in js/route.js (single source of truth). -->
@@ -192,7 +192,6 @@
     </div>
   </div>
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/fence.js"></script>
   <script src="data/lakes.js"></script>
   <script src="data/islands.js"></script>
   <script src="js/pois.js"></script>
