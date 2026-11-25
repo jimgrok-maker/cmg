@@ -104,7 +104,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         webView = new WebView(this);
+        webView.setBackgroundColor(0xFF0E1015);
         setContentView(webView);
 
         if (Build.VERSION.SDK_INT >= 33) {

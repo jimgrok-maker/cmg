@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#101816" />
+  <meta name="theme-color" content="#0E1015" />
   <title>CMG — Course Made Good</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="css/app.css" />
@@ -11,9 +11,18 @@
 <body>
   <div id="app">
     <header>
-      <div>
-        <div class="brand">CMG</div>
-        <div class="sub" id="headerSub">Course Made Good</div>
+      <div class="brand-wrap">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9.5" stroke="#F59E0B" stroke-width="1.6" opacity="0.65" />
+            <path d="M12 4.2L15.1 12L12 10.6L8.9 12L12 4.2Z" fill="#F59E0B" />
+            <path d="M12 19.8L14.2 12L12 13.2L9.8 12L12 19.8Z" fill="#F1F5F9" opacity="0.85" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand">CMG</div>
+          <div class="sub" id="headerSub">Course Made Good</div>
+        </div>
       </div>
       <div class="hud" id="hud">
         <div class="hud-tab live">
@@ -37,110 +46,163 @@
         <button type="button" class="tab" id="tabFaq">FAQ</button>
       </div>
       <div id="setupPane">
-        <h2 id="setupTitle">Water</h2>
-        <label for="lake">Lake or bay</label>
-        <select id="lake">
-          <option value="erie" selected>Lake Erie</option>
-          <option value="ontario">Lake Ontario</option>
-          <option value="huron">Lake Huron</option>
-          <option value="michigan">Lake Michigan</option>
-          <option value="superior">Lake Superior</option>
-          <option value="chesapeake">Chesapeake Bay</option>
-          <option value="mosquito">Mosquito Creek Lake</option>
-          <option value="buckeye">Buckeye Lake</option>
-          <option value="alum">Alum Creek Lake</option>
-          <option value="grand">Grand Lake St. Marys</option>
-          <option value="indian">Indian Lake</option>
-          <option value="guilford">Guilford Lake</option>
-        </select>
-        <div class="row" style="margin-top:0.45rem">
-          <label>Wind source
-            <select id="windSource">
-              <option value="hrrr">HRRR (default)</option>
-              <option value="gfs">GFS</option>
-              <option value="ecmwf">ECMWF</option>
-              <option value="manual">Manual TWD / TWS</option>
+        <div class="card">
+          <div class="card-title">Waters &amp; Wind</div>
+          <h2 id="setupTitle">Water</h2>
+          <label for="lake">Lake or bay
+            <select id="lake">
+              <option value="erie" selected>Lake Erie</option>
+              <option value="ontario">Lake Ontario</option>
+              <option value="huron">Lake Huron</option>
+              <option value="michigan">Lake Michigan</option>
+              <option value="superior">Lake Superior</option>
+              <option value="chesapeake">Chesapeake Bay</option>
+              <option value="mosquito">Mosquito Creek Lake</option>
+              <option value="buckeye">Buckeye Lake</option>
+              <option value="alum">Alum Creek Lake</option>
+              <option value="grand">Grand Lake St. Marys</option>
+              <option value="indian">Indian Lake</option>
+              <option value="guilford">Guilford Lake</option>
             </select>
           </label>
-          <label>Depths
-            <span class="disclaimer">Not in this app. Use a NOAA or CHS chart.</span>
+          <div class="row mt-sm">
+            <label>Wind source
+              <select id="windSource">
+                <option value="hrrr">HRRR (default)</option>
+                <option value="gfs">GFS</option>
+                <option value="ecmwf">ECMWF</option>
+                <option value="manual">Manual TWD / TWS</option>
+              </select>
+            </label>
+            <label>Depths
+              <span class="depth-note">Not in this app. Use a NOAA or CHS chart.</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Vessel &amp; Polars</div>
+          <div class="row">
+            <label>Boat
+              <select id="boat"></select>
+            </label>
+            <label id="genericWrap" class="hidden">LWL (ft)
+              <input id="genericLwl" type="number" min="8" max="80" step="0.1" />
+            </label>
+          </div>
+          <p id="boatMeta" class="disclaimer"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Routing &amp; Motor</div>
+          <label>Motor avg (kn)
+            <select id="motorKn">
+              <option value="2">2 — idle, save fuel</option>
+              <option value="3">3</option>
+              <option value="4" selected>4 — default</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8 — hull speed-ish</option>
+            </select>
+          </label>
+          <p class="disclaimer">Motor speed used when a plan motors. Lower is a fuel save, not a faster trip.</p>
+          <label class="mt-sm">Plan
+            <select id="plan">
+              <option value="sail" selected>Maximize sailing time</option>
+              <option value="fast">Maximize fastest time to destination</option>
+            </select>
+          </label>
+          <p class="disclaimer">Sailing never motors; a leg inside the no-go angle is timed as if tacked. Fastest motors any leg the engine would finish sooner, including legs too close to the wind, at the speed above.</p>
+          <label class="check-row">
+            <input type="checkbox" id="mag" /> Magnetic courses (<span id="varLabel">Var —</span>)
           </label>
         </div>
-        <div class="row" style="margin-top:0.45rem">
-          <label>Boat
-            <select id="boat"></select>
-          </label>
-          <label id="genericWrap" class="hidden">LWL (ft)
-            <input id="genericLwl" type="number" min="12" max="50" step="0.1" />
-          </label>
-        </div>
-        <p id="boatMeta" class="disclaimer"></p>
-        <label style="margin-top:0.45rem">Motor avg (kn)
-          <select id="motorKn">
-            <option value="2">2 — idle, save fuel</option>
-            <option value="3">3</option>
-            <option value="4" selected>4 — default</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-            <option value="8">8 — hull speed-ish</option>
-          </select>
-        </label>
-        <p class="disclaimer">Motor speed used when a plan motors. Lower is a fuel save, not a faster trip.</p>
-        <label style="margin-top:0.45rem">Plan
-          <select id="plan">
-            <option value="sail" selected>Maximize sailing time</option>
-            <option value="fast">Maximize fastest time to destination</option>
-          </select>
-        </label>
-        <p class="disclaimer">Sailing never motors; a leg inside the no-go angle is timed as if tacked. Fastest motors any leg the engine would finish sooner, including legs too close to the wind, at the speed above.</p>
-        <label style="margin-top:0.4rem;flex-direction:row;align-items:center;gap:0.45rem;text-transform:none">
-          <input type="checkbox" id="mag" /> Magnetic courses (<span id="varLabel">Var —</span>)
-        </label>
+
         <div class="chip">Planning aid, not a chartplotter. Check NOAA / CHS for depths. Lake Erie uses an OpenStreetMap shoreline and islands and routes around islands. Other waters use a rough outline with no island routing. Legs that cross land are flagged, not rerouted.</div>
-        <button class="primary" id="openChart" style="width:100%;margin-top:0.4rem">Open chart</button>
+        <button class="primary" id="openChart" style="width:100%;margin-top:0.3rem">Open chart</button>
       </div>
       <div id="faqPane" class="faq hidden">
-        <h3>What is CMG?</h3>
-        <p>A trip planner with a live SOG and gold GPS track. Not a chartplotter. Always check NOAA / CHS for depths. CMG does not model currents, leeway, waves or depths.</p>
-        <h3>Leave-at</h3>
-        <p>Default is the time the app opened; tap Use now to reset it. Set a later departure and every wind hour and ETA shifts to that clock. HRRR only covers about two days, so use GFS or ECMWF for a later trip.</p>
-        <h3>TWD FROM vs the arrow</h3>
-        <p>Numbers are meteorological FROM. Arrows point where the wind blows. A barb label shows the FROM direction, plus G and gust knots when the forecast has them. One barb per hour (every 2 hours on trips over 10 hours).</p>
-        <h3>Route colors</h3>
-        <p>Red is no-go, under 45°. Orange is pinched (45–55°). Yellow is tight (55–80°). Green is a reach (80–140°). Slate is deep (140–165°). Brown is a dead run (over 165°). Blue is a leg CMG motors.</p>
-        <h3>Where does the wind come from?</h3>
-        <p>Open-Meteo forecasts: HRRR (default, ~3 km, hourly, about 2 days ahead), GFS (about 7 days) or ECMWF (0.25° ≈ 25 km, about 7 days), or Manual. After you place marks, CMG samples up to 12 points along the route and uses the nearest one for each leg at the time you are predicted to be there. Past a model's range CMG falls back to the TWS / TWD boxes and warns you.</p>
-        <h3>Typing your own wind</h3>
-        <p>With HRRR, GFS or ECMWF selected the forecast is used for every leg, and the TWS / TWD boxes are only a fallback (each refresh overwrites them). To plan your own wind, choose Manual.</p>
-        <h3>No cell signal</h3>
-        <p>Your last forecast and the route's wind points are saved on the phone and used offline, with their age shown. A saved forecast older than about 4 hours is marked STALE. While online, CMG asks for a new forecast every 60 minutes and rebuilds the route's wind points when they are an hour old. If a refresh fails, the saved wind is kept and its age shown. Map tiles are not saved, so the map goes blank without a connection; marks, routes and outlines still work.</p>
-        <h3>P50 / P90</h3>
-        <p>P50 is the planned time from the boat model and the forecast wind, including any motoring. P90 is simply P50 × 1.22, a rule-of-thumb allowance for lulls, slop and forecast error. It is not a statistical forecast.</p>
-        <h3>Tacking</h3>
-        <p>For a leg closer than 45° to the wind, CMG plans tacks at about 47° off the wind. If no tacks fit around land, the leg is drawn dashed and timed as if tacked (the fastest plan motors it).</p>
-        <h3>Calm wind</h3>
-        <p>Under 2 kn the boat does not move in the model. In the sail plan, one calm hour on a leg makes the whole ETA (P50 and P90) show —. Fastest and Hybrid motor those legs instead.</p>
-        <h3>Plans and motor</h3>
-        <p>Maximize sailing time never motors. Fastest motors any leg the engine would finish sooner, including legs too close to the wind. Hybrid compare (checkbox) motors legs where boat speed is under 2 kn and legs too close to the wind. Motor speed is the Setup value.</p>
-        <h3>Offset 8 nm</h3>
-        <p>The Offset checkbox compares your route with going via a mark 8 nm windward or 8 nm leeward of the middle of the route. It is a comparison, not a router.</p>
-        <h3>Boats</h3>
-        <p>Boat speeds come from a formula (waterline length, wind speed and angle, a per-boat factor, capped near hull speed), not measured polars. Listed: MacGregor 26X, Catalina 22, Catalina 30, Hunter 34, S2 8.0 and West Wight Potter 19, or Generic by waterline length.</p>
-        <h3>Magnetic courses</h3>
-        <p>The checkbox adds a fixed westerly variation for the lake (Erie 7.6°W) to the courses shown on legs. It has no year or drift. Wind directions always stay true.</p>
-        <h3>SOG vs polar</h3>
-        <p>After about 20 minutes of GPS motion, CMG compares live SOG to the planned average speed.</p>
-        <h3>Fence vs chart</h3>
-        <p>The dashed lines are the shoreline and island outlines CMG uses as its water / land test. On Lake Erie they come from OpenStreetMap, simplified to about 90 m. Other waters use a rough outline. They are not a chart, depths are not included, and your GPS track ignores them.</p>
-        <h3>Islands</h3>
-        <p>Lake Erie is routed around its islands (islets under about 0.2 nm across are ignored). Every other lake and Chesapeake Bay uses a rough outline with no islands, so add taps around coves and islands yourself. A leg that still crosses land is flagged, not rerouted.</p>
-        <h3>GPX</h3>
-        <p>Export GPX sends the planned route (your marks, automatic detours around islands, and planned tack points) through the Android share sheet, for example to OpenCPN or Files. It is a route of positions only, with no times. Planning stays in CMG; the last mile stays on a real chart.</p>
-        <h3>Marks and GPS track</h3>
-        <p>Your marks are saved on the phone and come back when you reopen the app. The gold GPS track is saved too (last 4,000 points; Clear track erases it). CMG is not set up to record the track while it is in the background.</p>
-        <h3>Data sources</h3>
-        <p>Wind: Open-Meteo. Map tiles and the Lake Erie shoreline and islands: © OpenStreetMap contributors.</p>
+        <div class="faq-card">
+          <h3>What is CMG?</h3>
+          <p>A trip planner with a live SOG and gold GPS track. Not a chartplotter. Always check NOAA / CHS for depths. CMG does not model currents, leeway, waves or depths.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Leave-at</h3>
+          <p>Default is the time the app opened; tap Use now to reset it. Set a later departure and every wind hour and ETA shifts to that clock. HRRR only covers about two days, so use GFS or ECMWF for a later trip.</p>
+        </div>
+        <div class="faq-card">
+          <h3>TWD FROM vs the arrow</h3>
+          <p>Numbers are meteorological FROM. Arrows point where the wind blows. A barb label shows the FROM direction, plus G and gust knots when the forecast has them. One barb per hour (every 2 hours on trips over 10 hours).</p>
+        </div>
+        <div class="faq-card">
+          <h3>Route colors</h3>
+          <p>Red is no-go, under 45°. Orange is pinched (45–55°). Yellow is tight (55–80°). Green is a reach (80–140°). Slate is deep (140–165°). Brown is a dead run (over 165°). Blue is a leg CMG motors.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Where does the wind come from?</h3>
+          <p>Open-Meteo forecasts: HRRR (default, ~3 km, hourly, about 2 days ahead), GFS (about 7 days) or ECMWF (0.25° ≈ 25 km, about 7 days), or Manual. After you place marks, CMG samples up to 12 points along the route and uses the nearest one for each leg at the time you are predicted to be there. Past a model's range CMG falls back to the TWS / TWD boxes and warns you.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Typing your own wind</h3>
+          <p>With HRRR, GFS or ECMWF selected the forecast is used for every leg, and the TWS / TWD boxes are only a fallback (each refresh overwrites them). To plan your own wind, choose Manual.</p>
+        </div>
+        <div class="faq-card">
+          <h3>No cell signal</h3>
+          <p>Your last forecast and the route's wind points are saved on the phone and used offline, with their age shown. A saved forecast older than about 4 hours is marked STALE. While online, CMG asks for a new forecast every 60 minutes and rebuilds the route's wind points when they are an hour old. If a refresh fails, the saved wind is kept and its age shown. Map tiles are not saved, so the map goes blank without a connection; marks, routes and outlines still work.</p>
+        </div>
+        <div class="faq-card">
+          <h3>P50 / P90</h3>
+          <p>P50 is the planned time from the boat model and the forecast wind, including any motoring. P90 is simply P50 × 1.22, a rule-of-thumb allowance for lulls, slop and forecast error. It is not a statistical forecast.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Tacking</h3>
+          <p>For a leg closer than 45° to the wind, CMG plans tacks at about 47° off the wind. If no tacks fit around land, the leg is drawn dashed and timed as if tacked (the fastest plan motors it).</p>
+        </div>
+        <div class="faq-card">
+          <h3>Calm wind</h3>
+          <p>Under 2 kn the boat does not move in the model. In the sail plan, one calm hour on a leg makes the whole ETA (P50 and P90) show —. Fastest and Hybrid motor those legs instead.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Plans and motor</h3>
+          <p>Maximize sailing time never motors. Fastest motors any leg the engine would finish sooner, including legs too close to the wind. Hybrid compare (checkbox) motors legs where boat speed is under 2 kn and legs too close to the wind. Motor speed is the Setup value.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Offset 8 nm</h3>
+          <p>The Offset checkbox compares your route with going via a mark 8 nm windward or 8 nm leeward of the middle of the route. It is a comparison, not a router.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Boats</h3>
+          <p>Boat speeds come from a formula (waterline length, wind speed and angle, a per-boat factor, capped near hull speed), not measured polars. Listed: MacGregor 26X, Catalina 22, Catalina 30, Hunter 34, S2 8.0 and West Wight Potter 19, or Generic by waterline length.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Magnetic courses</h3>
+          <p>The checkbox adds a fixed westerly variation for the lake (Erie 7.6°W) to the courses shown on legs. It has no year or drift. Wind directions always stay true.</p>
+        </div>
+        <div class="faq-card">
+          <h3>SOG vs polar</h3>
+          <p>After about 20 minutes of GPS motion, CMG compares live SOG to the planned average speed.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Fence vs chart</h3>
+          <p>The dashed lines are the shoreline and island outlines CMG uses as its water / land test. On Lake Erie they come from OpenStreetMap, simplified to about 90 m. Other waters use a rough outline. They are not a chart, depths are not included, and your GPS track ignores them.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Islands</h3>
+          <p>Lake Erie is routed around its islands (islets under about 0.2 nm across are ignored). Every other lake and Chesapeake Bay uses a rough outline with no islands, so add taps around coves and islands yourself. A leg that still crosses land is flagged, not rerouted.</p>
+        </div>
+        <div class="faq-card">
+          <h3>GPX</h3>
+          <p>Export GPX sends the planned route (your marks, automatic detours around islands, and planned tack points) through the Android share sheet, for example to OpenCPN or Files. It is a route of positions only, with no times. Planning stays in CMG; the last mile stays on a real chart.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Marks and GPS track</h3>
+          <p>Your marks are saved on the phone and come back when you reopen the app. The gold GPS track is saved too (last 4,000 points; Clear track erases it). CMG is not set up to record the track while it is in the background.</p>
+        </div>
+        <div class="faq-card">
+          <h3>Data sources</h3>
+          <p>Wind: Open-Meteo. Map tiles and the Lake Erie shoreline and islands: © OpenStreetMap contributors.</p>
+        </div>
       </div>
     </section>
     <div id="planner" class="hidden">
@@ -157,35 +219,39 @@
           <span><i style="background:#f0d060"></i>GPS track</span>
         </div>
       </div>
-      <section class="sheet">
+      <section class="sheet" id="plannerSheet">
+        <div class="sheet-handle-row">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <button type="button" class="sheet-pill-btn" id="sheetToggle">Expand</button>
+        </div>
         <div class="row3">
           <label>TWS kn<input id="tws" type="number" step="0.5" min="0" max="40" /></label>
           <label>TWD from °<input id="twd" type="number" step="1" min="0" max="360" /></label>
           <label>Listed mark<select id="poi"></select></label>
         </div>
-        <div class="row" style="margin-top:0.35rem">
+        <div class="row mt-sm">
           <label>Leave at
             <input id="depart" type="datetime-local" />
           </label>
-          <button type="button" class="ghost" id="departNow" style="align-self:end">Use now</button>
+          <button type="button" class="ghost" id="departNow" style="align-self:end;width:100%;min-height:44px">Use now</button>
         </div>
-        <p id="windLabel" class="disclaimer"></p>
-        <p id="polarDelta" class="disclaimer"></p>
-        <label style="flex-direction:row;align-items:center;gap:0.45rem;text-transform:none;margin:0.3rem 0">
-          <input type="checkbox" id="hybrid" /> Hybrid compare — motor at the setup speed if boat speed < 2 kn
+        <p id="windLabel" class="status-pill"></p>
+        <p id="polarDelta" class="status-pill"></p>
+        <label class="check-row">
+          <input type="checkbox" id="hybrid" /> Hybrid compare — motor at the setup speed if boat speed &lt; 2 kn
         </label>
-        <label style="flex-direction:row;align-items:center;gap:0.45rem;text-transform:none;margin:0.3rem 0">
+        <label class="check-row">
           <!-- Keep the "8" in sync with OFFSET_NM in js/route.js (single source of truth). -->
           <input type="checkbox" id="offset" /> Offset 8 nm — rhumb vs windward vs leeward
         </label>
-        <p id="offsetLine" class="disclaimer"></p>
+        <p id="offsetLine" class="status-pill"></p>
         <div class="stats" id="stats"></div>
         <p id="routeWarn" class="chip hidden"></p>
         <div id="wps"></div>
-        <div style="display:flex;gap:0.4rem;margin-top:0.35rem;flex-wrap:wrap">
-          <button class="ghost" id="clearWp">Clear marks</button>
-          <button class="ghost" id="clearTrack">Clear track</button>
-          <button class="ghost" id="exportGpx">Export GPX</button>
+        <div class="actions-row">
+          <button type="button" class="ghost" id="clearWp">Clear marks</button>
+          <button type="button" class="ghost" id="clearTrack">Clear track</button>
+          <button type="button" class="ghost accent-btn" id="exportGpx">Export GPX</button>
         </div>
         <p class="disclaimer">Gold line is your GPS track. Planned route stays color-coded by TWA. Export GPX for the plotter.</p>
       </section>
@@ -201,5 +267,6 @@
   <script src="js/route.js"></script>
   <script src="js/app.js"></script>
   <script src="js/gpx-bind.js"></script>
+  <script src="js/ui-chrome.js"></script>
 </body>
 </html>
